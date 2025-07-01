@@ -5,22 +5,30 @@
   gather_facts: yes
 
   tasks:
-    - name: Fail if OS is not Ubuntu 22.04
+    - name: Check OS is Ubuntu 22.04
       fail:
         msg: "This playbook only supports Ubuntu 22.04"
       when: not (ansible_distribution == "Ubuntu" and ansible_distribution_version == "22.04")
 
-    - name: Check that CPU is Intel
+    - name: Check CPU is Intel
       shell: lscpu | grep -i "Vendor ID" | grep -i GenuineIntel
       register: intel_cpu_check
       changed_when: false
       failed_when: intel_cpu_check.rc != 0
 
-    - name: Check that NVIDIA GPU is present
+    - name: Check NVIDIA GPU is present
       shell: lspci | grep -i nvidia
       register: nvidia_gpu_check
       changed_when: false
       failed_when: nvidia_gpu_check.rc != 0
+
+    - name: Set system check fact
+      set_fact:
+        requirements_met: true
+
+    - name: End play if requirements are not satisfied
+      meta: end_play
+      when: requirements_met is not defined or not requirements_met
 
 
 - name: Install required system packages
