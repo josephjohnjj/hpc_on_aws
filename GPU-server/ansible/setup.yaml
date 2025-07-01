@@ -175,6 +175,60 @@
         test_command: nvidia-smi
 
 
+- name: Create 3 MIG instances on each GPU and debug GPU count before/after
+  hosts: ec2
+  become: yes
+  gather_facts: no
+
+  tasks:
+    - name: Check if nvidia-smi is installed
+      command: which nvidia-smi
+      register: nvidia_smi_check
+      changed_when: false
+      failed_when: nvidia_smi_check.rc != 0
+      ignore_errors: yes
+
+    - name: Fail if nvidia-smi is not installed
+      fail:
+        msg: "nvidia-smi not found on this host. Cannot proceed."
+      when: nvidia_smi_check.rc != 0
+
+    - name: Get number of GPUs BEFORE MIG creation
+      command: nvidia-smi --list-gpus
+      register: gpu_list_before
+      changed_when: false
+
+    - name: Print number of GPUs BEFORE MIG creation
+      debug:
+        msg: "Number of GPUs before MIG creation: {{ gpu_list_before.stdout_lines | length }}"
+
+    - name: Set GPU count fact
+      set_fact:
+        gpu_count: "{{ gpu_list_before.stdout_lines | length }}"
+
+    - name: Create 3 MIG instances on each GPU
+      shell: |
+        for _ in {1..3}; do
+          nvidia-smi mig -cgi 14 -C -i {{ item }}
+        done
+      loop: "{{ query('sequence', '0,' ~ (gpu_count - 1) ) }}"
+      register: mig_create_results
+      ignore_errors: yes
+
+    - name: Report MIG instance creation results
+      debug:
+        var: mig_create_results.results
+
+    - name: Get number of GPUs AFTER MIG creation
+      command: nvidia-smi --list-gpus
+      register: gpu_list_after
+      changed_when: false
+
+    - name: Print number of GPUs AFTER MIG creation
+      debug:
+        msg: "Number of GPUs after MIG creation: {{ gpu_list_after.stdout_lines | length }}"
+
+
 - name: Create CUDA user group and users
   hosts: ec2
   become: yes
