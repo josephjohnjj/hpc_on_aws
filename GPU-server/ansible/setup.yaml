@@ -77,7 +77,47 @@
         - ansible_distribution_version == "22.04"
         - hostvars[inventory_hostname].intel_cpu_check.rc == 0
         - hostvars[inventory_hostname].nvidia_gpu_check.rc == 0
-        
+
+- name: Make Spack environment available system-wide
+  hosts: ec2
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Create /etc/profile.d/spack.sh with Spack environment setup
+      copy:
+        dest: /etc/profile.d/spack.sh
+        content: |
+          export SPACK_ROOT=/apps/spack
+          . $SPACK_ROOT/share/spack/setup-env.sh
+        owner: root
+        group: root
+        mode: '0644'
+      when:
+        - ansible_distribution == "Ubuntu"
+        - ansible_distribution_version == "22.04"
+        - hostvars[inventory_hostname].intel_cpu_check.rc == 0
+        - hostvars[inventory_hostname].nvidia_gpu_check.rc == 0
+
+    - name: Ensure /etc/profile.d/spack.sh is readable by all
+      file:
+        path: /etc/profile.d/spack.sh
+        mode: '0644'
+      when:
+        - ansible_distribution == "Ubuntu"
+        - ansible_distribution_version == "22.04"
+        - hostvars[inventory_hostname].intel_cpu_check.rc == 0
+        - hostvars[inventory_hostname].nvidia_gpu_check.rc == 0
+
+- name: Run a command with Spack environment activated
+  shell: . /etc/profile.d/spack.sh && spack --version
+  register: spack_version
+  changed_when: false
+
+- debug:
+    var: spack_version.stdout
+
+    
 - name: Create CUDA user group and users
   hosts: ec2
   become: yes
