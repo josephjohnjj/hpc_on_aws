@@ -250,3 +250,61 @@ Create a file named ``varfile.tfvars`` with the following contents.
 
 Terraform automatically loads all files in the current directory with the exact name ``terraform.tfvars``.
 You can also use the ``-var-file`` flag to specify other files by name.
+
+Output instance configuration
+-------------------------------
+
+Create a file called outputs.tf in your learn-terraform-aws-instance directory. Add the configuration
+below to outputs.tf to define outputs for your EC2 instance's ID and IP address.
+
+.. code-block:: bash
+    :linenos:
+
+    output "instance_id" {
+        description = "ID of the EC2 instance"
+        value       = aws_instance.app_server.id
+    }
+
+    output "instance_public_ip" {
+      description = "Public IP address of the EC2 instance"
+      value       = aws_instance.app_server.public_ip
+    }
+
+
+Onece you execute ``terraform apply`` it prints output values to the screen. You can also query the
+outputs with the ``terraform output`` command.
+
+
+
+Output instance configuration
+-------------------------------
+
+Create a file called outputs.tf in your learn-terraform-aws-instance directory. Add the configuration
+below to outputs.tf to define outputs for your EC2 instance's ID and IP address.
+
+.. code-block:: bash
+    :linenos:
+
+    output "instance_id" {
+        description = "ID of the EC2 instance"
+        value       = aws_instance.app_server.id
+    }
+
+    output "instance_public_ip" {
+      description = "Public IP address of the EC2 instance"
+      value       = aws_instance.app_server.public_ip
+    }
+
+
+Onece you execute ``terraform apply`` it prints output values to the screen. You can also query the
+outputs with the ``terraform output`` command.
+
+
+
+HCP Terraform
+--------------------
+
+Use the tutorial given below:
+
+https://developer.hashicorp.com/terraform/tutorials/cloud-get-started/cloud-login
+
