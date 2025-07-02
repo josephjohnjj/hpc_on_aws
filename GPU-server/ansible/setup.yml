@@ -1,0 +1,449 @@
+---
+- name: Validate system requirements
+  hosts: ec2
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Check OS is Ubuntu 22.04
+      fail:
+        msg: "This playbook only supports Ubuntu 22.04"
+      when: not (ansible_distribution == "Ubuntu" and ansible_distribution_version == "22.04")
+
+    - name: Check CPU is Intel
+      shell: lscpu | grep -i "Vendor ID" | grep -i GenuineIntel
+      register: intel_cpu_check
+      changed_when: false
+      failed_when: intel_cpu_check.rc != 0
+
+    - name: Check NVIDIA GPU is present
+      shell: lspci | grep -i nvidia
+      register: nvidia_gpu_check
+      changed_when: false
+      failed_when: nvidia_gpu_check.rc != 0
+
+    - name: Set system check fact
+      set_fact:
+        requirements_met: true
+
+    - name: End play if requirements are not satisfied
+      meta: end_play
+      when: requirements_met is not defined or not requirements_met
+
+
+- name: Install required system packages
+  hosts: ec2
+  become: yes
+  gather_facts: yes
+
+  vars:
+    required_packages:
+      - acl
+      - build-essential
+      - curl
+      - git
+      - wget
+      - htop
+
+  tasks:
+    - name: Force apt update
+      apt:
+        update_cache: yes
+
+    - name: Install required packages
+      apt:
+        name: "{{ required_packages }}"
+        state: present
+
+
+- name: Install Spack into /apps/spack
+  hosts: ec2
+  become: yes
+  gather_facts: no  # already gathered
+  vars:
+    app_dir: /apps
+    git_repo: "https://github.com/spack/spack.git"
+
+  tasks:
+    - name: Create /apps directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      when:
+        - hostvars[inventory_hostname].ansible_distribution == "Ubuntu"
+        - hostvars[inventory_hostname].ansible_distribution_version == "22.04"
+        - hostvars[inventory_hostname].intel_cpu_check.rc == 0
+        - hostvars[inventory_hostname].nvidia_gpu_check.rc == 0
+
+    - name: Clone spack repo into /apps/spack if not present
+      git:
+        repo: "{{ git_repo }}"
+        dest: "{{ app_dir }}/spack"
+        depth: 2
+        update: yes
+      become_user: "{{ ansible_user }}"
+      when:
+        - hostvars[inventory_hostname].ansible_distribution == "Ubuntu"
+        - hostvars[inventory_hostname].ansible_distribution_version == "22.04"
+        - hostvars[inventory_hostname].intel_cpu_check.rc == 0
+        - hostvars[inventory_hostname].nvidia_gpu_check.rc == 0
+
+
+- name: Set ownership of /apps to the current user
+  hosts: ec2
+  become: yes
+  gather_facts: yes  # needed to resolve ansible_user
+
+  tasks:
+    - name: Set recursive ownership of /apps
+      file:
+        path: /apps
+        state: directory
+        recurse: yes
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      when:
+        - ansible_distribution == "Ubuntu"
+        - ansible_distribution_version == "22.04"
+        - hostvars[inventory_hostname].intel_cpu_check.rc == 0
+        - hostvars[inventory_hostname].nvidia_gpu_check.rc == 0
+
+- name: Make Spack environment available system-wide
+  hosts: ec2
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Create /etc/profile.d/spack.sh with Spack environment setup
+      copy:
+        dest: /etc/profile.d/spack.sh
+        content: |
+          export SPACK_ROOT=/apps/spack
+          . $SPACK_ROOT/share/spack/setup-env.sh
+        owner: root
+        group: root
+        mode: '0644'
+      when:
+        - ansible_distribution == "Ubuntu"
+        - ansible_distribution_version == "22.04"
+        - hostvars[inventory_hostname].intel_cpu_check.rc == 0
+        - hostvars[inventory_hostname].nvidia_gpu_check.rc == 0
+
+    - name: Ensure /etc/profile.d/spack.sh is readable by all
+      file:
+        path: /etc/profile.d/spack.sh
+        mode: '0644'
+      when:
+        - ansible_distribution == "Ubuntu"
+        - ansible_distribution_version == "22.04"
+        - hostvars[inventory_hostname].intel_cpu_check.rc == 0
+        - hostvars[inventory_hostname].nvidia_gpu_check.rc == 0
+
+- name: Run a command with Spack environment activated
+  shell: . /etc/profile.d/spack.sh && spack --version
+  register: spack_version
+  changed_when: false
+
+- debug:
+    var: spack_version.stdout
+
+
+
+- name: Enable MIG mode on all detected NVIDIA GPUs and report status
+  hosts: ec2
+  become: yes
+  gather_facts: no
+
+  tasks:
+    - name: Check if nvidia-smi is installed
+      command: which nvidia-smi
+      register: nvidia_smi_check
+      changed_when: false
+      failed_when: nvidia_smi_check.rc != 0
+      ignore_errors: yes
+
+    - name: Fail if nvidia-smi is not installed
+      fail:
+        msg: "nvidia-smi not found on this host. Cannot proceed."
+      when: nvidia_smi_check.rc != 0
+
+    - name: Get number of GPUs
+      command: nvidia-smi --list-gpus
+      register: gpu_list
+      changed_when: false
+
+    - name: Set GPU count fact
+      set_fact:
+        gpu_count: "{{ gpu_list.stdout_lines | length }}"
+
+    - name: Debug GPU count
+      debug:
+        msg: "Detected {{ gpu_count }} GPUs"
+
+    - name: Enable MIG mode on each GPU
+      shell: nvidia-smi -i {{ item }} -mig 1
+      loop: "{{ query('sequence', '0,' ~ (gpu_count - 1) ) }}"
+      register: mig_enable_results
+      ignore_errors: yes
+
+    - name: Report results of enabling MIG
+      debug:
+        var: mig_enable_results.results
+
+    - name: Show current MIG status for all GPUs
+      shell: nvidia-smi -q -d MIG
+      register: mig_status
+      changed_when: false
+
+    - name: Print MIG status
+      debug:
+        var: mig_status.stdout_lines
+
+    - name: Reboot the machine to apply MIG mode
+      reboot:
+        reboot_timeout: 600
+        test_command: nvidia-smi
+
+
+- name: Create 3 MIG instances on each GPU and debug GPU count before/after
+  hosts: ec2
+  become: yes
+  gather_facts: no
+
+  tasks:
+    - name: Check if nvidia-smi is installed
+      command: which nvidia-smi
+      register: nvidia_smi_check
+      changed_when: false
+      failed_when: nvidia_smi_check.rc != 0
+      ignore_errors: yes
+
+    - name: Fail if nvidia-smi is not installed
+      fail:
+        msg: "nvidia-smi not found on this host. Cannot proceed."
+      when: nvidia_smi_check.rc != 0
+
+    - name: Get number of GPUs BEFORE MIG creation
+      command: nvidia-smi --list-gpus
+      register: gpu_list_before
+      changed_when: false
+
+    - name: Print number of GPUs BEFORE MIG creation
+      debug:
+        msg: "Number of GPUs before MIG creation: {{ gpu_list_before.stdout_lines | length }}"
+
+    - name: Set GPU count fact
+      set_fact:
+        gpu_count: "{{ gpu_list_before.stdout_lines | length }}"
+
+    - name: Create 3 MIG instances on each GPU
+      shell: |
+        for _ in {1..3}; do
+          nvidia-smi mig -cgi 14 -C -i {{ item }}
+        done
+      loop: "{{ query('sequence', '0,' ~ (gpu_count - 1) ) }}"
+      register: mig_create_results
+      ignore_errors: yes
+
+    - name: Report MIG instance creation results
+      debug:
+        var: mig_create_results.results
+
+    - name: Get number of GPUs AFTER MIG creation
+      command: nvidia-smi --list-gpus
+      register: gpu_list_after
+      changed_when: false
+
+    - name: Print number of GPUs AFTER MIG creation
+      debug:
+        msg: "Number of GPUs after MIG creation: {{ gpu_list_after.stdout_lines | length }}"
+
+
+- name: Setup spackadmin group and users with sudo and /apps permissions
+  hosts: ec2
+  become: yes
+  gather_facts: yes
+
+  vars:
+    spack_group: spackadmin
+    spack_user: spackuser
+    spack_dir: /apps
+    user_password: "nci@Kambri"
+    current_user: "{{ ansible_env.USER }}"
+
+  tasks:
+    - name: Create group "{{ spack_group }}"
+      group:
+        name: "{{ spack_group }}"
+        state: present
+
+    - name: Create user "{{ spack_user }}" with password and add to "{{ spack_group }}"
+      user:
+        name: "{{ spack_user }}"
+        groups: "{{ spack_group }}"
+        append: yes
+        password: "{{ user_password | password_hash('sha512') }}"
+        shell: /bin/bash
+        create_home: yes
+        state: present
+
+    - name: Add current user "{{ current_user }}" to "{{ spack_group }}"
+      user:
+        name: "{{ current_user }}"
+        groups: "{{ spack_group }}"
+        append: yes
+
+    - name: Give "{{ spack_group }}" sudo privileges without password
+      copy:
+        dest: "/etc/sudoers.d/{{ spack_group }}"
+        content: "{{ spack_group }} ALL=(ALL) NOPASSWD:ALL\n"
+        owner: root
+        group: root
+        mode: '0440'
+
+    - name: Change ownership of "{{ spack_dir }}" to root:"{{ spack_group }}"
+      file:
+        path: "{{ spack_dir }}"
+        state: directory
+        recurse: yes
+        owner: root
+        group: "{{ spack_group }}"
+
+    - name: Set group read/write/execute permissions on "{{ spack_dir }}"
+      file:
+        path: "{{ spack_dir }}"
+        recurse: yes
+        mode: "g+rwX"
+
+    - name: Set setgid bit on directories inside "{{ spack_dir }}"
+      command: find "{{ spack_dir }}" -type d -exec chmod g+s {} \;
+
+    - name: Ensure group sticky bit set on "{{ spack_dir }}"
+      file:
+        path: "{{ spack_dir }}"
+        mode: "g+s"
+
+    - name: Set others read and execute permissions on "{{ spack_dir }}"
+      file:
+        path: "{{ spack_dir }}"
+        recurse: yes
+        mode: "o=rx"
+
+
+- name: Create CUDA user group and 30 users
+  hosts: ec2
+  become: yes
+  gather_facts: no
+  vars:
+    user_count: 30
+    default_password: "nciuser"  # password for all users
+    user_prefix: "user"
+
+  tasks:
+    - name: Create supergroup 'cudauser'
+      group:
+        name: cudauser
+        state: present
+      when:
+        - ansible_distribution == "Ubuntu"
+        - ansible_distribution_version == "22.04"
+        - intel_cpu_check.rc == 0
+        - nvidia_gpu_check.rc == 0
+
+    - name: Create 30 users and add to cudauser group
+      user:
+        name: "{{ user_prefix }}{{ item }}"
+        groups: cudauser
+        append: yes
+        password: "{{ default_password | password_hash('sha512') }}"
+        shell: /bin/bash
+        state: present
+      loop: "{{ query('sequence', 'start=1 end=' + user_count|string) }}"
+      when:
+        - ansible_distribution == "Ubuntu"
+        - ansible_distribution_version == "22.04"
+        - intel_cpu_check.rc == 0
+        - nvidia_gpu_check.rc == 0
+
+
+- name: Grant ACL-based permissions to cudauser group on /apps
+  hosts: ec2
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Ensure ACL package is installed
+      apt:
+        name: acl
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Grant read and execute (rx) permissions recursively to group cudauser
+      command: setfacl -R -m g:cudauser:rx /apps
+
+    - name: Set default ACL for new files/folders in /apps for group cudauser
+      command: setfacl -R -d -m g:cudauser:rx /apps
+
+
+- name: Install CUDA 12.3 using Spack
+  hosts: ec2
+  become: yes
+  gather_facts: yes
+  environment:
+    SPACK_ROOT: /apps/spack
+    PATH: "/apps/spack/bin:{{ ansible_env.PATH }}"
+    BASH_ENV: /apps/spack/share/spack/setup-env.sh
+
+  vars:
+    spack_cuda_version: "12.3"
+
+  tasks:
+    - name: List available Spack packages (spack list)
+      shell: . /apps/spack/share/spack/setup-env.sh && spack list
+      register: spack_list
+      changed_when: false
+
+    - name: Output available packages
+      debug:
+        var: spack_list.stdout_lines
+
+    - name: Detect installed compilers (spack compiler find)
+      shell: . /apps/spack/share/spack/setup-env.sh && spack compiler find
+      register: compiler_find
+      changed_when: false
+
+    - name: List recognized compilers (spack compilers)
+      shell: . /apps/spack/share/spack/setup-env.sh && spack compilers
+      register: compiler_list
+      changed_when: false
+
+    - name: Output recognized compilers
+      debug:
+        var: compiler_list.stdout_lines
+
+    - name: Install CUDA {{ spack_cuda_version }}
+      shell: . /apps/spack/share/spack/setup-env.sh && spack install cuda@{{ spack_cuda_version }}
+      args:
+        chdir: /apps/spack
+      register: spack_cuda_install
+      retries: 3
+      delay: 30
+      until: spack_cuda_install.rc == 0
+
+    - name: List installed Spack packages (spack find)
+      shell: . /apps/spack/share/spack/setup-env.sh && spack find
+      register: spack_find
+      changed_when: false
+
+    - name: Output installed Spack packages
+      debug:
+        var: spack_find.stdout_lines
+
+    - name: Load CUDA {{ spack_cuda_version }} environment
+      shell: . /apps/spack/share/spack/setup-env.sh && spack load cuda@{{ spack_cuda_version }}
+      changed_when: false
+
