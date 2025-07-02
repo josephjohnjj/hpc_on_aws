@@ -1,11 +1,9 @@
-Name of the Workshop
+GPU Server in AWS
 =================================================
 
-This repository provides an introduction to the concepts of parallel programming using Python.
+This repository provides an introduction to different concepts in Terraform and Ansible. It also details the terraform code and asnible playbook
+used to provision the NCI Training GOU server.
 
-.. note::
-
-   This project is under active development.
 
 Contents
 --------
