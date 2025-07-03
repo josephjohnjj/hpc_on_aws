@@ -1,0 +1,22 @@
+- name: Distribute collected public keys to all nodes for passwordless SSH
+  hosts: all
+  become: no
+  gather_facts: no
+
+  vars:
+    target_user: ubuntu
+
+  tasks:
+    - name: Read all public keys from local keys directory
+      delegate_to: localhost
+      find:
+        paths: "./keys"
+        patterns: "*.pub"
+      register: pubkey_files
+
+    - name: Append each public key to authorized_keys on remote hosts
+      authorized_key:
+        user: "{{ target_user }}"
+        key: "{{ lookup('file', item.path) }}"
+        state: present
+      loop: "{{ pubkey_files.files }}"
