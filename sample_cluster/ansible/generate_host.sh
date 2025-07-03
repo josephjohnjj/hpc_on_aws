@@ -28,3 +28,7 @@ done <<< "$CLEANED_OUTPUT"
 
 echo "Ansible inventory 'host.ini' created with the following hosts and IPs:"
 cat host.ini
+
+echo "Directory 'keys' created to hold instance keys."
+[ -d "keys" ] && rm -rf keys
+mkdir -p keys
