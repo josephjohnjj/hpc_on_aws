@@ -1,14 +1,33 @@
-- name: Distribute collected public keys to all nodes for passwordless SSH
-  hosts: all
-  become: no
-  gather_facts: no
+---
+- name: Setup passwordless SSH between EC2 nodes
+  hosts: ec2
+  gather_facts: yes
+  become: yes
 
   vars:
     target_user: ubuntu
+    ssh_dir: "/home/{{ target_user }}/.ssh"
 
   tasks:
+    - name: Ensure .ssh directory exists
+      file:
+        path: "{{ ssh_dir }}"
+        state: directory
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: '0700'
+
+    - name: Ensure known_hosts file exists
+      file:
+        path: "{{ ssh_dir }}/known_hosts"
+        state: touch
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: '0644'
+
     - name: Read all public keys from local keys directory
       delegate_to: localhost
+      become: false
       find:
         paths: "./keys"
         patterns: "*.pub"
@@ -20,3 +39,49 @@
         key: "{{ lookup('file', item.path) }}"
         state: present
       loop: "{{ pubkey_files.files }}"
+
+    - name: Gather all EC2 private IPs
+      set_fact:
+        all_private_ips: "{{ groups['ec2'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}"
+
+    - name: Compute other nodes' private IPs for this host
+      set_fact:
+        other_private_ips: "{{ all_private_ips | difference([ansible_default_ipv4.address]) }}"
+
+    - name: Remove stale known_hosts entries for private IPs
+      known_hosts:
+        path: "{{ ssh_dir }}/known_hosts"
+        name: "{{ item }}"
+        state: absent
+      loop: "{{ other_private_ips }}"
+      become_user: "{{ target_user }}"
+
+    - name: Add other nodes' SSH host keys to known_hosts (from EC2 nodes)
+      become_user: "{{ target_user }}"
+      shell: ssh-keyscan -H {{ item }} >> {{ ssh_dir }}/known_hosts
+      args:
+        executable: /bin/bash
+      loop: "{{ other_private_ips }}"
+
+    - name: Configure SSH client to avoid host key confirmation
+      copy:
+        dest: "{{ ssh_dir }}/config"
+        content: |
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile {{ ssh_dir }}/known_hosts
+            LogLevel ERROR
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: '0600'
+
+    - name: Test SSH connection to other nodes
+      become_user: "{{ target_user }}"
+      shell: ssh -o BatchMode=yes -o ConnectTimeout=3 ubuntu@{{ item }} "echo Connected to $(hostname)"
+      loop: "{{ other_private_ips }}"
+      register: ssh_test
+      ignore_errors: true
+
+    - name: Show SSH test results
+      debug:
+        var: ssh_test.results
