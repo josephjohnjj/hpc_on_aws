@@ -38,6 +38,6 @@ resource "aws_instance" "app_server" {
 
   # Add tags to the instance for identification and management.
   tags = {
-    Name = "gpu-ssh-server"  # Name tag appears in the EC2 console
+    Name = "NCI-GPU-Server"  # Name tag appears in the EC2 console
   }
 }
