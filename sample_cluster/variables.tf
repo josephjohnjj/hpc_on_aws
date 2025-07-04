@@ -7,5 +7,5 @@ variable "instance_name" {
 variable "node_count" {
   description = "Number of EC2 instances to create in the cluster"
   type        = number
-  default     = 3
+  default     = 5
 }
