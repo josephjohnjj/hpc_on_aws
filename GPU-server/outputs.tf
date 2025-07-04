@@ -6,7 +6,7 @@ output "instance_id" {
   description = "ID of the EC2 instance"
 
   # The actual value to output: the unique ID of the EC2 instance created
-  value = aws_instance.app_server.id
+  value = aws_instance.GpuTrainingServer.id
 }
 
 # -----------------------------------
@@ -17,5 +17,5 @@ output "instance_public_ip" {
   description = "Public IP address of the EC2 instance"
 
   # The value to output: the public IP assigned to the instance
-  value = aws_instance.app_server.public_ip
+  value = aws_instance.GpuTrainingServer.public_ip
 }

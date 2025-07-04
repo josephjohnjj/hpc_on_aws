@@ -50,7 +50,7 @@ resource "aws_security_group" "ssh_access" {
     to_port   = 0
 
     # "-1" means "all protocols"
-    protocol  = "-1"
+    protocol = "-1"
 
     # Allow outgoing traffic to any IPv4 address
     cidr_blocks = ["0.0.0.0/0"]
@@ -60,6 +60,6 @@ resource "aws_security_group" "ssh_access" {
   # Tag for Easy Identification
   # -----------------------------
   tags = {
-    Name = "ssh-access"  # This tag shows up in AWS Console
+    Name = "GPU-Server-ssh-access" # This tag shows up in AWS Console
   }
 }

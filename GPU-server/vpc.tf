@@ -15,7 +15,7 @@ resource "aws_vpc" "main" {
 
   # Add a tag to easily identify this VPC in the AWS Console
   tags = {
-    Name = "main-vpc"
+    Name = "GPU-Server-main-vpc"
   }
 }
 
@@ -28,7 +28,7 @@ resource "aws_internet_gateway" "main" {
 
   # Tag the internet gateway for identification
   tags = {
-    Name = "main-gateway"
+    Name = "GPU-Server-main-gateway"
   }
 }
 
@@ -49,7 +49,7 @@ resource "aws_subnet" "public" {
 
   # Tag for easier identification in the console
   tags = {
-    Name = "public-subnet"
+    Name = "GPU-Server-public-subnet"
   }
 }
 
@@ -69,7 +69,7 @@ resource "aws_route_table" "public" {
 
   # Tag for visibility in the AWS Console
   tags = {
-    Name = "public-route-table"
+    Name = "GPU-Server-public-route-table"
   }
 }
 

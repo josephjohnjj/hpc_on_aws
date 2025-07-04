@@ -11,8 +11,52 @@ variable "instance_name" {
 
   # The default value to use if no value is provided in a .tfvars file
   # or via the command line. This means the variable is optional.
-  default = "ExampleAppServerInstance"
+  default = "NCI-GPU-Server"
 }
+
+
+# -----------------------------------------------------
+# Input Variable Declaration: instance_type
+# -----------------------------------------------------
+variable "instance_type" {
+  # A human-readable description that explains what this variable does.
+  # This value sets the EC2 instance type, such as t2.micro (free tier),
+  # or a powerful GPU instance like p3.2xlarge.
+  #
+  # You can find a list of available EC2 instance types in the AWS docs:
+  # https://aws.amazon.com/ec2/instance-types/
+  description = "EC2 instance type (e.g., t2.micro, p3.2xlarge)"
+
+  # The type of value this variable expects: a plain string.
+  type = string
+
+  # The default value used if no value is provided in .tfvars or CLI.
+  # This defaults to a general-purpose free-tier eligible instance.
+  default = "t2.micro"
+}
+
+# -----------------------------------------------------
+# Input Variable Declaration: ami
+# -----------------------------------------------------
+variable "ami" {
+  # This description explains what the variable is used for.
+  # The AMI (Amazon Machine Image) defines the OS and software
+  # pre-installed on the EC2 instance. It must be valid in your
+  # selected AWS region.
+  #
+  # You can look up public AMIs for Ubuntu, Amazon Linux, etc.,
+  # using the AWS Console or CLI.
+  description = "AMI ID to use for launching the EC2 instance"
+
+  # The type of the variable is a string, which holds the AMI ID.
+  type = string
+
+  # Default value to use if not specified externally.
+  # NOTE: Replace this with an AMI that is available in your region,
+  # and matches the OS/image requirements for your project.
+  default = "ami-020cba7c55df1f615" # Example AMI ID for Ubuntu 22.04 LTS
+}
+
 
 # -----------------------------------------------------
 # Input Variable Declaration: capacity_reservation_id
@@ -33,3 +77,5 @@ variable "capacity_reservation_id" {
   # Default value is empty string indicating no capacity reservation.
   default = ""
 }
+
+
