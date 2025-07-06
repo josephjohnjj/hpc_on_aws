@@ -1,0 +1,47 @@
+// Generate a secure password for user 'cale'
+resource "random_password" "cale_pw" {
+  length           = 16
+  override_characters = "!@#$%&*()-_+="
+}
+
+// Import the SSH key pair for initial access
+resource "aws_key_pair" "hcp_key" {
+  key_name   = "terraform-user"
+  public_key = file("${path.module}/keys/terraform-user.pub")
+}
+
+// Launch an EC2 instance and provision the 'cale' user with a password
+resource "aws_instance" "app_server" {
+  ami                         = "ami-020cba7c55df1f615"
+  instance_type               = "t2.micro"
+  key_name                    = aws_key_pair.hcp_key.key_name
+  subnet_id                   = aws_subnet.public.id
+  vpc_security_group_ids      = [aws_security_group.ssh_access.id]
+  associate_public_ip_address = true
+
+  // cloud-init to enable password SSH, create 'cale', and set its password
+  user_data = <<-EOF
+    #cloud-config
+    ssh_pwauth: true
+    users:
+      - name: cale
+        gecos: "Cale User"
+        sudo: ALL=(ALL) NOPASSWD:ALL
+        lock_passwd: false
+    chpasswd:
+      list: |
+        cale:${random_password.cale_pw.result}
+      expire: false
+  EOF
+
+  tags = {
+    Name = "gpu-ssh-server"
+  }
+}
+
+// Expose the generated password as a sensitive output for secure delivery
+output "cale_password" {
+  value       = random_password.cale_pw.result
+  description = "Password for the 'cale' user on the new EC2 instance"
+  sensitive   = true
+}

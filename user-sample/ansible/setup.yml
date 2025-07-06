@@ -1,0 +1,43 @@
+---
+- name: Setup EC2 instance for CUDA users and Spack
+  hosts: ec2
+  become: yes
+  vars:
+    app_dir: /apps
+    git_repo: "https://github.com/spack/spack.git"
+    users_to_add:
+      - user1
+      - user
+    default_password: "cudauser"  # Change this to a secure password
+
+  tasks:
+    - name: Create /apps directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+
+    - name: Clone spack repo into /apps/spack if not present
+      git:
+        repo: "{{ git_repo }}"
+        dest: "{{ app_dir }}/spack"
+        depth: 2
+        update: yes
+      become_user: "{{ ansible_user }}"
+
+    - name: Create supergroup 'cudauser'
+      group:
+        name: cudauser
+        state: present
+
+    - name: Create users and add to cudauser group
+      user:
+        name: "{{ item }}"
+        groups: cudauser
+        append: yes
+        password: "{{ default_password | password_hash('sha512') }}"
+        shell: /bin/bash
+        state: present
+      loop: "{{ users_to_add }}"
