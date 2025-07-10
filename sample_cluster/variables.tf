@@ -102,7 +102,3 @@ variable "aws_region" {
 }
 
 
-variable "subnet_ids" {
-  description = "List of subnet IDs where EFS mount targets will be created"
-  default     = [aws_subnet.public.id]
-}
