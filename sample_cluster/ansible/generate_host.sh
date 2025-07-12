@@ -1,34 +1,39 @@
 #!/bin/bash
+set -e
 
-# Ensure script runs in bash
-if [ -z "$BASH_VERSION" ]; then
-  echo "Please run this script with bash: bash generate_host.sh"
-  exit 1
-fi
+OUTPUTS=$(terraform -chdir=.. output -json)
 
-# Fetch the raw Terraform output
-RAW_OUTPUT=$(terraform -chdir=.. output instance_public_ips 2>/dev/null)
+CONTROL_PUB=$(echo "$OUTPUTS" | jq -r '.control_node_public_ip.value')
+LOGIN_PUB=$(echo "$OUTPUTS" | jq -r '.login_node_public_ips.value[0]')
+COMPUTE_PUBS=($(echo "$OUTPUTS" | jq -r '.compute_node_public_ips.value[]'))
 
-# Clean and normalize: remove brackets, quotes, spaces, and blank lines
-CLEANED_OUTPUT=$(echo "$RAW_OUTPUT" | tr -d '[]" ' | tr ',' '\n' | sed '/^$/d')
+# Expand ~ to full home directory path
+SSH_KEY="/home/joseph/.ssh/terraform-user"
 
-# Check if the cleaned output is empty
-if [ -z "$CLEANED_OUTPUT" ]; then
-  echo "Error: Failed to retrieve valid IPs from Terraform output."
-  exit 1
-fi
+# Start writing host.ini
+cat <<EOF > host.ini
+[control]
+node1 ansible_host=$CONTROL_PUB ansible_user=ubuntu ansible_ssh_private_key_file=$SSH_KEY
 
-# Write Ansible inventory file with aliases
-echo "[ec2]" > host.ini
-count=1
-while IFS= read -r ip; do
-  echo "node${count} ansible_host=$ip ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/terraform-user" >> host.ini
+[login]
+node2 ansible_host=$LOGIN_PUB ansible_user=ubuntu ansible_ssh_private_key_file=$SSH_KEY
+
+[compute]
+EOF
+
+count=3
+for ip in "${COMPUTE_PUBS[@]}"; do
+  echo "node$count ansible_host=$ip ansible_user=ubuntu ansible_ssh_private_key_file=$SSH_KEY" >> host.ini
   ((count++))
-done <<< "$CLEANED_OUTPUT"
+done
 
-echo "Ansible inventory 'host.ini' created with the following hosts and IPs:"
+cat <<EOF >> host.ini
+
+[all:children]
+control
+login
+compute
+EOF
+
+echo "✅ Generated host.ini:"
 cat host.ini
-
-echo "Directory 'keys' created to hold instance keys."
-[ -d "keys" ] && rm -rf keys
-mkdir -p keys

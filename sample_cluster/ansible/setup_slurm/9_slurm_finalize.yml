@@ -1,0 +1,51 @@
+---
+- name: Finalize Slurm cluster setup
+  hosts: all
+  become: true
+  tasks:
+
+    - name: Ensure /var/spool/slurmctld exists on head node
+      file:
+        path: /var/spool/slurmctld
+        state: directory
+        owner: slurm
+        group: slurm
+        mode: '0700'
+      when: inventory_hostname == "node1"
+
+    - name: Enable and start slurmctld service on head node
+      systemd:
+        name: slurmctld
+        enabled: true
+        state: started
+      when: inventory_hostname == "node1"
+
+    - name: Enable and start slurmd service on compute nodes
+      systemd:
+        name: slurmd
+        enabled: true
+        state: started
+      when: inventory_hostname != "node1"
+
+- name: Check Slurm status from head node
+  hosts: node1
+  become: true
+  tasks:
+
+    - name: Run sinfo to view cluster state
+      command: sinfo
+      register: sinfo_output
+      changed_when: false
+
+    - name: Display sinfo output
+      debug:
+        var: sinfo_output.stdout
+
+    - name: Run scontrol show nodes
+      command: scontrol show nodes
+      register: scontrol_output
+      changed_when: false
+
+    - name: Display scontrol output
+      debug:
+        var: scontrol_output.stdout

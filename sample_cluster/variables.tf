@@ -1,9 +1,9 @@
 
 
 variable "node_count" {
-  description = "Number of EC2 instances to create in the cluster"
+  description = "Number of compute node EC2 instances to create in the cluster"
   type        = number
-  default     = 5
+  default     = 3
 }
 
 
@@ -92,7 +92,7 @@ variable "capacity_reservation_id" {
 variable "target_az" {
   description = "Availability Zone to use for resources (must match capacity reservation)"
   type        = string
-  default     = "us-east-1"
+  default     = "us-east-1c"
 }
 
 variable "aws_region" {

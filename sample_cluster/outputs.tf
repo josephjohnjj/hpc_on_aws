@@ -1,46 +1,55 @@
 ############################################
-# Terraform Output Definitions
-# These help you retrieve important info
-# from your infrastructure after 'apply'
+# Terraform Output Definitions by Node Role
 ############################################
 
 # --------------------------------------------
-# EC2 Instance IDs
+# Control Node
 # --------------------------------------------
-output "instance_ids" {
-  # Description appears in terraform output
-  description = "IDs of the EC2 instances"
+output "control_node_public_ip" {
+  description = "Public IP address of the control node"
+  value       = aws_instance.control_node.public_ip
+}
 
-  # Creates a list of EC2 instance IDs like: ["i-0abc...", "i-0def..."]
-  value = [for instance in aws_instance.cluster : instance.id]
+output "control_node_private_ip" {
+  description = "Private IP address of the control node"
+  value       = aws_instance.control_node.private_ip
 }
 
 # --------------------------------------------
-# EC2 Public IPs
+# Login Nodes (can be multiple)
 # --------------------------------------------
-output "instance_public_ips" {
-  description = "Public IP addresses of the EC2 instances"
+output "login_node_public_ips" {
+  description = "Public IP addresses of the login nodes"
+  value       = [for i in aws_instance.login_node : i.public_ip]
+}
 
-  # Creates a list of public IPs for each instance like: ["18.111.222.33", ...]
-  value = [for instance in aws_instance.cluster : instance.public_ip]
+output "login_node_private_ips" {
+  description = "Private IP addresses of the login nodes"
+  value       = [for i in aws_instance.login_node : i.private_ip]
 }
 
 # --------------------------------------------
-# EFS ID for /apps
+# Compute Nodes (usually many)
+# --------------------------------------------
+output "compute_node_public_ips" {
+  description = "Public IPs of the compute nodes (optional)"
+  value       = [for i in aws_instance.compute_node : i.public_ip]
+}
+
+output "compute_node_private_ips" {
+  description = "Private IPs of the compute nodes"
+  value       = [for i in aws_instance.compute_node : i.private_ip]
+}
+
+# --------------------------------------------
+# EFS IDs
 # --------------------------------------------
 output "efs_apps_id" {
   description = "EFS File System ID for /apps mount"
-
-  # Returns something like fs-0123456789abcdef0
-  value = aws_efs_file_system.apps.id
+  value       = aws_efs_file_system.apps.id
 }
 
-# --------------------------------------------
-# EFS ID for /scratch
-# --------------------------------------------
 output "efs_scratch_id" {
   description = "EFS File System ID for /scratch mount"
-
-  # Also returns something like fs-0fedcba9876543210
-  value = aws_efs_file_system.scratch.id
+  value       = aws_efs_file_system.scratch.id
 }

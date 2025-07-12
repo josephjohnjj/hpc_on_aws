@@ -1,15 +1,7 @@
 ---
-- name: Mount /apps and /scratch EFS volumes on Ubuntu EC2 nodes
-  hosts: ec2
+- name: Initial setup to build and install amazon-efs-utils on EC2 nodes
+  hosts: all
   become: yes
-  vars:
-    # Assuming these variables come from Terraform outputs with metadata (sensitive, type, value)
-    # efs_apps_id and efs_scratch_id should be passed to Ansible with this structure.
-    efs_filesystems:
-      - id: "{{ efs_apps_id.value }}"
-        mount_point: "/apps"
-      - id: "{{ efs_scratch_id.value }}"
-        mount_point: "/scratch"
 
   tasks:
     - name: Install system dependencies for building amazon-efs-utils
@@ -60,13 +52,14 @@
       command: ls -l /tmp/efs-utils/build/
       register: ls_build_dir
 
-    - debug:
+    - name: Debug the list of built files
+      debug:
         var: ls_build_dir.stdout_lines
 
     - name: Find amazon-efs-utils deb file
       find:
         paths: /tmp/efs-utils/build/
-        patterns: 'amazon-efs-utils*.deb'
+        patterns: "amazon-efs-utils*.deb"
         file_type: file
       register: deb_files
 
@@ -82,30 +75,3 @@
     - name: Install amazon-efs-utils deb package
       apt:
         deb: "{{ deb_file_path }}"
-
-    - name: Create mount directories
-      file:
-        path: "{{ item.mount_point }}"
-        state: directory
-        owner: root
-        group: root
-        mode: "0755"
-      loop: "{{ efs_filesystems }}"
-
-    - name: Mount EFS volumes
-      mount:
-        path: "{{ item.mount_point }}"
-        src: "{{ item.id }}:/"
-        fstype: efs
-        opts: defaults,_netdev
-        state: mounted
-      loop: "{{ efs_filesystems }}"
-
-    - name: Persist EFS mounts in /etc/fstab
-      mount:
-        path: "{{ item.mount_point }}"
-        src: "{{ item.id }}:/"
-        fstype: efs
-        opts: defaults,_netdev
-        state: present
-      loop: "{{ efs_filesystems }}"

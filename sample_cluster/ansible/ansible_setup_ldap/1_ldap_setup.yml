@@ -1,0 +1,117 @@
+---
+- name: Install and configure OpenLDAP server on control node
+  hosts: control
+  become: yes
+  vars:
+    ldap_domain: "ncitraininf.local"
+    ldap_organization: "NCI Training"
+    ldap_admin_password: "Nci@Kambri"
+
+  pre_tasks:
+    - name: Preconfigure slapd debconf selections
+      debconf:
+        name: slapd
+        question: "{{ item.question }}"
+        value: "{{ item.value }}"
+        vtype: "{{ item.vtype }}"
+      loop:
+        - { question: "slapd/no_configuration", value: "false", vtype: "boolean" }
+        - { question: "slapd/domain", value: "{{ ldap_domain }}", vtype: "string" }
+        - { question: "slapd/organization", value: "{{ ldap_organization }}", vtype: "string" }
+        - { question: "slapd/password1", value: "{{ ldap_admin_password }}", vtype: "password" }
+        - { question: "slapd/password2", value: "{{ ldap_admin_password }}", vtype: "password" }
+
+  tasks:
+    - name: Install slapd and ldap-utils
+      apt:
+        name:
+          - slapd
+          - ldap-utils
+        state: present
+        update_cache: yes
+
+    - name: Ensure slapd is running and enabled
+      service:
+        name: slapd
+        state: started
+        enabled: yes
+
+- name: Install and configure LDAP client on login and compute nodes
+  hosts: login,compute
+  become: yes
+  vars:
+    ldap_server_ip: >-
+      {{ hostvars[groups['control'][0]]['ansible_host']
+         | default(hostvars[groups['control'][0]]['ansible_default_ipv4']['address']) }}
+    ldap_base_dn: "dc=ncitraininf,dc=local"
+
+  pre_tasks:
+    - name: Set debconf values for ldap-auth-config to avoid prompts
+      debconf:
+        name: ldap-auth-config
+        question: "{{ item.question }}"
+        value: "{{ item.value }}"
+        vtype: "{{ item.vtype }}"
+      loop:
+        - { question: "ldap-auth-config/ldapns/ldap-server", value: "ldap://{{ ldap_server_ip }}", vtype: "string" }
+        - { question: "ldap-auth-config/ldapns/base-dn", value: "{{ ldap_base_dn }}", vtype: "string" }
+        - { question: "ldap-auth-config/ldapns/ldap_version", value: "3", vtype: "string" }
+        - { question: "ldap-auth-config/dbrootlogin", value: "true", vtype: "boolean" }
+
+  tasks:
+    - name: Install LDAP client packages
+      apt:
+        name:
+          - libnss-ldapd
+          - libpam-ldapd
+          - ldap-utils
+          - nslcd
+          - nscd
+        state: present
+        update_cache: yes
+
+    - name: Configure /etc/ldap/ldap.conf
+      copy:
+        dest: /etc/ldap/ldap.conf
+        content: |
+          BASE {{ ldap_base_dn }}
+          URI ldap://{{ ldap_server_ip }}
+        mode: '0644'
+
+    - name: Configure /etc/nslcd.conf
+      copy:
+        dest: /etc/nslcd.conf
+        content: |
+          uid nslcd
+          gid nslcd
+          uri ldap://{{ ldap_server_ip }}
+          base {{ ldap_base_dn }}
+          bind_timelimit 5
+          timelimit 15
+          reconnect_sleeptime 1
+          reconnect_retrytime 5
+          reconnect_maxconntries 5
+          ssl no
+        mode: '0644'
+
+    - name: Configure /etc/nsswitch.conf to use ldap for passwd, group, shadow
+      lineinfile:
+        path: /etc/nsswitch.conf
+        regexp: "^({{ item.key }}:).*"
+        line: "{{ item.key }}: files ldap"
+      loop:
+        - { key: passwd }
+        - { key: group }
+        - { key: shadow }
+
+    - name: Restart nslcd service
+      service:
+        name: nslcd
+        state: restarted
+        enabled: yes
+
+    - name: Restart nscd service
+      service:
+        name: nscd
+        state: restarted
+        enabled: yes

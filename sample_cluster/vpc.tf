@@ -47,6 +47,9 @@ resource "aws_subnet" "public" {
   # Automatically assign a public IP address to instances launched in this subnet
   map_public_ip_on_launch = true
 
+
+  availability_zone = var.target_az
+
   tags = {
     Name = "public-subnet"
   }

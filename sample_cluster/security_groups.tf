@@ -68,8 +68,8 @@ resource "aws_security_group" "efs_sg" {
     from_port       = 2049 # NFS port
     to_port         = 2049
     protocol        = "tcp" # NFS uses TCP
-    security_groups = [aws_security_group.ssh_access.id]
-    # 👆 This allows only EC2 instances in the 'ssh_access' SG to connect
+    security_groups = [aws_security_group.internal.id]
+    # 👆 This allows only EC2 instances in the 'internal' SG to connect
     # to EFS using NFS. It references the other SG directly.
   }
 
@@ -87,3 +87,34 @@ resource "aws_security_group" "efs_sg" {
     Name = "efs-sg"
   }
 }
+
+
+# -----------------------------------------------------
+# Security Group for Internal Node Communication
+# -----------------------------------------------------
+resource "aws_security_group" "internal" {
+  name        = "internal-communication"
+  description = "Allow internal traffic between EC2 nodes"
+  vpc_id      = aws_vpc.main.id
+
+  # Allow internal communication on all ports (fine-tuned later if needed)
+  ingress {
+    description = "Allow all traffic from within the SG"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "internal-sg"
+  }
+}
+
