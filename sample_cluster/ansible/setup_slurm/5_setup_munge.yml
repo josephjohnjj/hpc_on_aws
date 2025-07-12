@@ -71,7 +71,7 @@
     - name: Check MUNGE service status
       systemd:
         name: munge
-        register: munge_service
+      register: munge_service
       ignore_errors: true
 
     - name: Output MUNGE service status

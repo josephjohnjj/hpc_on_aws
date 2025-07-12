@@ -1,0 +1,34 @@
+---
+- name: Verify Slurm installation from controller node
+  hosts: control
+  become: true
+  tasks:
+    - name: Check sinfo for cluster state
+      command: sinfo
+      register: sinfo_output
+      changed_when: false
+      failed_when: sinfo_output.rc != 0
+
+    - name: Show sinfo output
+      debug:
+        var: sinfo_output.stdout
+
+    - name: Check scontrol for node information
+      command: scontrol show nodes
+      register: scontrol_output
+      changed_when: false
+      failed_when: scontrol_output.rc != 0
+
+    - name: Show scontrol output
+      debug:
+        var: scontrol_output.stdout
+
+    - name: Submit a simple job with srun (test if Slurm can launch tasks)
+      command: srun -N1 hostname
+      register: srun_output
+      changed_when: false
+      failed_when: srun_output.rc != 0
+
+    - name: Show srun output
+      debug:
+        var: srun_output.stdout

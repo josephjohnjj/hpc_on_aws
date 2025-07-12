@@ -1,8 +1,9 @@
+---
 - name: Distribute MUNGE key from head node to all nodes
   hosts: all
   become: true
   vars:
-    munge_key_source: /usr/sbin/mungekey
+    munge_key_source: /etc/munge/munge.key
     munge_key_dest: /etc/munge/munge.key
     munge_key_local_tmp: "{{ playbook_dir }}/mungekey"  # absolute dir relative to playbook location
 
@@ -23,7 +24,6 @@
         dest: "{{ munge_key_local_tmp }}/munge.key"
         flat: true
       when: inventory_hostname == "node1"
-      register: fetch_result
       run_once: true
 
     - name: Set munge_key_path fact for all hosts
@@ -32,14 +32,20 @@
       run_once: true
       delegate_to: localhost
 
-    - name: Copy munge.key from control node to all other nodes
+    - name: Copy munge.key from control node to all nodes
       copy:
         src: "{{ munge_key_path }}"
         dest: "{{ munge_key_dest }}"
         owner: munge
         group: munge
-        mode: '0700'
-      when: inventory_hostname != "node1"
+        mode: '0400'   # FIXED: proper permission
+        force: true
+
+    - name: Restart munge service
+      systemd:
+        name: munge
+        state: restarted
+        enabled: true
 
     - name: Compute SHA256 hash of the MUNGE key
       command: sha256sum {{ munge_key_dest }}

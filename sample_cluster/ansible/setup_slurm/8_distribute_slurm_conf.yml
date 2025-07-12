@@ -14,7 +14,7 @@
 
     - name: Copy slurm.conf to all nodes
       copy:
-        src: slurm_config/slurm.conf
+        src: ./slurm.conf
         dest: /etc/slurm/slurm.conf
         owner: root
         group: root
