@@ -53,3 +53,8 @@ output "efs_scratch_id" {
   description = "EFS File System ID for /scratch mount"
   value       = aws_efs_file_system.scratch.id
 }
+
+output "efs_home_id" {
+  description = "EFS File System ID for /home mount"
+  value       = aws_efs_file_system.home.id
+}
