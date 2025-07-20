@@ -1,0 +1,3 @@
+ssh_key_path: "/home/{{ ansible_user }}/.ssh/id_rsa"
+
+target_user: ubuntu

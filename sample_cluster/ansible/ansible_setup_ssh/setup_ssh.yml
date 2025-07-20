@@ -1,0 +1,130 @@
+---
+- name: Setup inter-instance SSH keys for all hosts
+  hosts: all
+  become: yes
+  gather_facts: no
+
+  tasks:
+    - name: Delete keys directory if it exists (on control node)
+      file:
+        path: "./keys"
+        state: absent
+      delegate_to: localhost
+      become: false
+      tags:
+        - ssh_keys
+        - ssh_setup
+
+    - name: Recreate empty keys directory (on control node)
+      file:
+        path: "./keys"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      become: false
+      tags:
+        - ssh_keys
+        - ssh_setup
+
+    - name: Ensure .ssh directory exists
+      file:
+        path: "/home/{{ ansible_user }}/.ssh"
+        state: directory
+        mode: '0700'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      tags:
+        - ssh_keys
+        - ssh_setup
+
+    - name: Generate SSH key pair (if not present)
+      openssh_keypair:
+        path: "{{ ssh_key_path }}"
+        type: rsa
+        size: 4096
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+      tags:
+        - ssh_keys
+        - ssh_setup
+
+    - name: Read public key
+      slurp:
+        src: "{{ ssh_key_path }}.pub"
+      register: pubkey
+      tags:
+        - ssh_keys
+        - ssh_setup
+
+    - name: Save public key locally
+      delegate_to: localhost
+      become: no
+      copy:
+        content: "{{ pubkey.content | b64decode }}"
+        dest: "./keys/{{ inventory_hostname }}.pub"
+      tags:
+        - ssh_keys
+        - ssh_setup
+
+- name: Set hostnames and update /etc/hosts for all nodes
+  hosts: all
+  become: yes
+  gather_facts: true
+
+  tasks:
+    - name: Compute dynamic hostname
+      set_fact:
+        dynamic_hostname: "node{{ groups['all'].index(inventory_hostname) + 1 }}"
+      tags:
+        - hostnames
+        - network_setup
+
+    - name: Set hostname using hostnamectl
+      ansible.builtin.hostname:
+        name: "{{ dynamic_hostname }}"
+      tags:
+        - hostnames
+        - network_setup
+
+    - name: Update /etc/hostname file
+      copy:
+        dest: /etc/hostname
+        content: "{{ dynamic_hostname }}\n"
+        owner: root
+        group: root
+        mode: '0644'
+      tags:
+        - hostnames
+        - network_setup
+
+    - name: Ensure localhost and IPv6 entries are present in /etc/hosts
+      blockinfile:
+        path: /etc/hosts
+        block: |
+          127.0.0.1 localhost
+
+          # The following lines are desirable for IPv6 capable hosts
+          ::1 ip6-localhost ip6-loopback
+          fe00::0 ip6-localnet
+          ff00::0 ip6-mcastprefix
+          ff02::1 ip6-allnodes
+          ff02::2 ip6-allrouters
+          ff02::3 ip6-allhosts
+        create: yes
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+      tags:
+        - hostnames
+        - network_setup
+
+    - name: Add all nodes' IPs and hostnames to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        regexp: '^{{ hostvars[item].ansible_default_ipv4.address }}\s+node{{ groups["all"].index(item) + 1 }}$'
+        line: "{{ hostvars[item].ansible_default_ipv4.address }} node{{ groups['all'].index(item) + 1 }}"
+        state: present
+      loop: "{{ groups['all'] }}"
+      when: hostvars[item].ansible_default_ipv4 is defined
+      tags:
+        - hostnames
+        - network_setup
