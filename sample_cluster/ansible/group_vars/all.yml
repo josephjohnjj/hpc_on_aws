@@ -1,3 +1,6 @@
-ssh_key_path: "/home/{{ ansible_user }}/.ssh/id_rsa"
+target_user: "{{ ansible_user | default('ubuntu') }}"
+base_name: node
+keys_dir: "./keys"
 
-target_user: ubuntu
+ssh_dir: "/home/{{ target_user }}/.ssh"
+ssh_key_path: "{{ ssh_dir }}/id_rsa"

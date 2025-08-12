@@ -1,0 +1,199 @@
+---
+
+###############################################################################
+# PLAY 1: Generate per-host SSH keys and collect pubkeys to ./keys (control)
+###############################################################################
+- name: Collect SSH public keys from all hosts
+  hosts: all
+  become: yes
+  gather_facts: no
+
+
+  pre_tasks:
+    - name: (control) Reset keys directory once
+      delegate_to: localhost
+      become: false
+      run_once: true
+      block:
+        - name: Delete keys dir if it exists
+          file:
+            path: "{{ keys_dir }}"
+            state: absent
+        - name: Recreate empty keys dir
+          file:
+            path: "{{ keys_dir }}"
+            state: directory
+            mode: '0755'
+
+  tasks:
+    - name: Ensure .ssh exists
+      file:
+        path: "/home/{{ target_user }}/.ssh"
+        state: directory
+        mode: '0700'
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+
+    - name: Generate SSH key pair (if not present)
+      openssh_keypair:
+        path: "{{ ssh_key_path }}"
+        type: rsa
+        size: 4096
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: '0600'
+      tags: [ssh_keys]
+
+    - name: Read public key
+      slurp:
+        src: "{{ ssh_key_path }}.pub"
+      register: pubkey
+
+    - name: (control) Save public key for this host
+      delegate_to: localhost
+      become: false
+      copy:
+        content: "{{ pubkey.content | b64decode }}"
+        dest: "{{ keys_dir }}/{{ inventory_hostname }}.pub"
+      tags: [ssh_keys]
+
+###############################################################################
+# PLAY 2: Set hostnames and /etc/hosts for all nodes
+###############################################################################
+- name: Set hostnames and update /etc/hosts
+  hosts: all
+  become: yes
+  gather_facts: true
+ 
+  tasks:
+    - name: Compute dynamic hostname
+      set_fact:
+        dynamic_hostname: "{{ base_name }}{{ groups['all'].index(inventory_hostname) + 1 }}"
+      tags: [hostnames]
+
+    - name: Set hostname
+      ansible.builtin.hostname:
+        name: "{{ dynamic_hostname }}"
+      tags: [hostnames]
+
+    - name: Ensure /etc/hostname matches
+      copy:
+        dest: /etc/hostname
+        content: "{{ dynamic_hostname }}\n"
+        owner: root
+        group: root
+        mode: '0644'
+      tags: [hostnames]
+
+    - name: Ensure localhost and IPv6 entries
+      blockinfile:
+        path: /etc/hosts
+        create: yes
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+        block: |
+          127.0.0.1 localhost
+
+      tags: [hostnames]
+
+    - name: Add all nodes (IP -> hostname) lines
+      lineinfile:
+        path: /etc/hosts
+        regexp: '^{{ hostvars[item].ansible_default_ipv4.address }}\s+{{ base_name }}{{ groups["all"].index(item) + 1 }}$'
+        line: "{{ hostvars[item].ansible_default_ipv4.address }} {{ base_name }}{{ groups['all'].index(item) + 1 }}"
+        state: present
+      loop: "{{ groups['all'] }}"
+      when: hostvars[item].ansible_default_ipv4 is defined
+      tags: [hostnames]
+
+###############################################################################
+# PLAY 3: Distribute keys, build known_hosts, test passwordless SSH
+###############################################################################
+- name: Setup passwordless SSH between nodes
+  hosts: all
+  gather_facts: yes
+  become: yes
+
+
+  tasks:
+    - name: Ensure .ssh exists
+      file:
+        path: "{{ ssh_dir }}"
+        state: directory
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: '0700'
+      tags: [ssh_mesh]
+
+    - name: Ensure known_hosts exists
+      file:
+        path: "{{ ssh_dir }}/known_hosts"
+        state: touch
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: '0644'
+      tags: [ssh_mesh]
+
+    - name: Add all collected pubkeys to authorized_keys
+      authorized_key:
+        user: "{{ target_user }}"
+        key: "{{ lookup('file', item) }}"
+        state: present
+      loop: "{{ lookup('fileglob', keys_dir ~ '/*.pub', wantlist=True) }}"
+      tags: [ssh_mesh]
+
+    - name: Gather all private IPs
+      set_fact:
+        all_private_ips: >-
+          {{ groups['all'] | map('extract', hostvars, ['ansible_default_ipv4','address']) | list }}
+      tags: [ssh_mesh]
+
+    - name: Compute other nodes' IPs for this host
+      set_fact:
+        other_private_ips: "{{ all_private_ips | difference([ansible_default_ipv4.address]) }}"
+      when: ansible_default_ipv4 is defined
+      tags: [ssh_mesh]
+
+    - name: Remove stale known_hosts entries (by IP)
+      known_hosts:
+        path: "{{ ssh_dir }}/known_hosts"
+        name: "{{ item }}"
+        state: absent
+      loop: "{{ other_private_ips | default([]) }}"
+      become_user: "{{ target_user }}"
+      tags: [ssh_mesh]
+
+    - name: Add other nodes' SSH host keys to known_hosts
+      become_user: "{{ target_user }}"
+      shell: |
+        ssh-keyscan -T 5 -H {{ item }} 2>/dev/null >> {{ ssh_dir }}/known_hosts || true
+      args:
+        executable: /bin/bash
+      loop: "{{ other_private_ips | default([]) }}"
+      tags: [ssh_mesh]
+
+    - name: Configure SSH client to avoid host key prompts
+      copy:
+        dest: "{{ ssh_dir }}/config"
+        content: |
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile {{ ssh_dir }}/known_hosts
+            LogLevel ERROR
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: '0600'
+      tags: [ssh_mesh]
+
+    - name: Test passwordless SSH to peers
+      become_user: "{{ target_user }}"
+      shell: ssh -o BatchMode=yes -o ConnectTimeout=3 {{ target_user }}@{{ item }} "echo Connected to $(hostname)"
+      loop: "{{ other_private_ips | default([]) }}"
+      register: ssh_test
+      ignore_errors: true
+      tags: [ssh_mesh]
+
+    - name: Show SSH test results
+      debug:
+        var: ssh_test.results
+      when: ssh_test is defined
+      tags: [ssh_mesh]
