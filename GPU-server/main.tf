@@ -19,7 +19,7 @@ terraform {
   # Configure Terraform Cloud or Enterprise usage
   cloud {
     # Name of your Terraform Cloud organization
-    organization = "NCI-Training-Team"
+    organization = "jxj900"
 
     # Specify the workspace to use in Terraform Cloud
     workspaces {
