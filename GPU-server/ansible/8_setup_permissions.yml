@@ -1,5 +1,5 @@
 # ---------------------------------------------------------
-# Play 10: Grant ACL Permissions on /apps to cudauser Group
+# Grant ACL Permissions on /apps to cudauser Group
 # ---------------------------------------------------------
 - name: Grant ACL-based permissions to cudauser group on /apps
   hosts: ec2

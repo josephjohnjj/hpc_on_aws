@@ -1,5 +1,5 @@
 # ---------------------------------------------------------
-# Play 2: Install Required System Packages
+# Install Required System Packages
 # ---------------------------------------------------------
 - name: Install required system packages
   hosts: ec2

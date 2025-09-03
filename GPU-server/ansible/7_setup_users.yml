@@ -1,5 +1,5 @@
 # ---------------------------------------------------------
-# Play 8: Setup spackadmin Group and Secure /apps Access
+# Setup spackadmin Group and Secure /apps Access
 # ---------------------------------------------------------
 - name: Setup spackadmin group and users with sudo and /apps permissions
   hosts: ec2
@@ -82,7 +82,7 @@
 
 
 # ---------------------------------------------------------
-# Play 9: Create 30 Users and Assign to cudauser Group
+# Create 30 Users and Assign to cudauser Group
 # ---------------------------------------------------------
 - name: Create CUDA user group and 30 users
   hosts: ec2

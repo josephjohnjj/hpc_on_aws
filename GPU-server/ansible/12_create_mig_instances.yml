@@ -1,5 +1,5 @@
 # ---------------------------------------------------------
-# Play 7: Create N MIG Instances per GPU (using variables)
+# Create N MIG Instances per GPU (using variables)
 # ---------------------------------------------------------
 - name: Create MIG instances on each GPU (configurable)
   hosts: ec2

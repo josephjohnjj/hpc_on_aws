@@ -1,5 +1,5 @@
 # ---------------------------------------------------------
-# Play 3: Clone Spack into /apps
+# Clone Spack into /apps
 # ---------------------------------------------------------
 - name: Install Spack into /apps/spack
   hosts: ec2
@@ -28,7 +28,7 @@
 
 
 # ---------------------------------------------------------
-# Play 4: Set Ownership of /apps to the Current User
+# Set Ownership of /apps to the Current User
 # ---------------------------------------------------------
 - name: Set ownership of /apps to the current user
   hosts: ec2
@@ -46,7 +46,7 @@
 
 
 # ---------------------------------------------------------
-# Play 5: Make Spack Available System-Wide
+# Make Spack Available System-Wide
 # ---------------------------------------------------------
 - name: Make Spack environment available system-wide
   hosts: ec2
@@ -67,7 +67,7 @@
 
 
 # ---------------------------------------------------------
-# Play 6: Run Spack and Print Its Version
+# Run Spack and Print Its Version
 # ---------------------------------------------------------
 - name: Run a command with Spack environment activated
   hosts: ec2

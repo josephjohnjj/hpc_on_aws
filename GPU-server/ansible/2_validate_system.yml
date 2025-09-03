@@ -1,6 +1,6 @@
 ---
 # ---------------------------------------------------------
-# Play 1: Validate EC2 System Requirements
+# Validate EC2 System Requirements
 # ---------------------------------------------------------
 - name: Validate system requirements
   hosts: ec2
