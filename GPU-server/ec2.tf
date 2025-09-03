@@ -38,6 +38,13 @@ resource "aws_instance" "GpuTrainingServer" {
   # Required for SSH access from the internet.
   associate_public_ip_address = true
 
+  # Use a dedicated tenancy for the instance. This ensures the instance runs on single-tenant 
+  # hardware. AWS default is "default" (shared tenancy).
+  tenancy = "dedicated"
+
+  # Specify the Availability Zone for the instance.
+  availability_zone = var.target_az
+
   # Add tags to the instance for identification and management.
   tags = {
     Name = "NCI-GPU-Server" # Name tag appears in the EC2 console
@@ -55,9 +62,10 @@ resource "aws_instance" "GpuTrainingServer" {
 
 
   # Explicit market type
-  instance_market_options {
-    market_type = "capacity-block"
-  }
+  #instance_market_options {
+  #  market_type = "capacity-block"
+  #}
+
 
   # Conditionally specify Capacity Reservation for this instance
   # If 'capacity_reservation_id' variable is non-empty, the instance
