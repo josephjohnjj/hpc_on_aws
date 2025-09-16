@@ -16,7 +16,10 @@ resource "aws_key_pair" "hcp_key" {
 resource "aws_instance" "GpuTrainingServer" {
   # The AMI ID for the EC2 instance.
   # This AMI must exist in your selected region.
-  #ami = "ami-05ee60afff9d0a480"  # Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.7 (Ubuntu 22.04) 20250602
+
+  # Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.7 (Ubuntu 22.04) 20250602
+  #ami = "ami-05ee60afff9d0a480"  # us-east-1
+  #ami = "ami-0f7e62cd1dcdf9b34"  # ap-northeast-1
   ami = var.ami # Example AMI ID for Ubuntu 22.04 LTS
 
   # The EC2 instance type.
@@ -54,22 +57,17 @@ resource "aws_instance" "GpuTrainingServer" {
   }
 
 
-  # Explicit market type
-  instance_market_options {
-    market_type = "capacity-block"
-  }
 
-  # Conditionally specify Capacity Reservation for this instance
-  # If 'capacity_reservation_id' variable is non-empty, the instance
-  # will launch into the specified Capacity Reservation block.
-  dynamic "capacity_reservation_specification" {
-    for_each = var.capacity_reservation_id != "" ? [1] : []
-
-    content {
-      capacity_reservation_target {
-        capacity_reservation_id = var.capacity_reservation_id
-      }
+  capacity_reservation_specification {
+    capacity_reservation_target {
+      capacity_reservation_id = var.capacity_reservation_id
     }
   }
+
+
+  depends_on = [
+    aws_subnet.public,
+    aws_security_group.ssh_access
+  ]
 
 }
