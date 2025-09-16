@@ -89,7 +89,7 @@
   become: yes
   gather_facts: no
   vars:
-    user_count: 30
+    user_count: 40
     default_password: "nciuser"  # Password for all 30 users
     user_prefix: "user"          # Users will be named user1, user2, ...
 
