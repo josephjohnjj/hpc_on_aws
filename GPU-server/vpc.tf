@@ -75,6 +75,8 @@ resource "aws_route_table" "public" {
   tags = {
     Name = "GPU-Server-public-route-table"
   }
+
+  depends_on = [aws_vpc.main, aws_internet_gateway.main]
 }
 
 # -----------------------------------------------------
