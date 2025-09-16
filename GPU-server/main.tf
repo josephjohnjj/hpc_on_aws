@@ -9,7 +9,7 @@ terraform {
       source = "hashicorp/aws"
 
       # Use version 4.16 or any compatible newer patch version (e.g., 4.16.x)
-      version = ">= 5.0"
+      version = ">= 5.15"
     }
   }
 
