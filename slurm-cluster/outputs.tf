@@ -44,12 +44,12 @@ output "compute_node_private_ips" {
 # --------------------------------------------
 # Storage_node Nodes (usually many)
 # --------------------------------------------
-output "compute_node_public_ips" {
+output "storage_node_public_ips" {
   description = "Public IPs of the storage nodes (optional)"
   value       = [for i in aws_instance.storage_node : i.public_ip]
 }
 
-output "compute_node_private_ips" {
+output "storage_node_private_ips" {
   description = "Private IPs of the storage nodes"
   value       = [for i in aws_instance.storage_node : i.private_ip]
 }

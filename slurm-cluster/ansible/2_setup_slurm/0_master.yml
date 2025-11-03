@@ -1,0 +1,10 @@
+---
+# master_slurm_setup.yml
+
+- import_playbook: 1_setup_munge.yml
+- import_playbook: 2_distribute_munge_key.yml
+- import_playbook: 3_install_slurm.yml
+- import_playbook: 4_distribute_slurm_conf.yml
+- import_playbook: 5_slurm_finalize.yml
+- import_playbook: 6_update_slurm_config.yml
+- import_playbook: 7_verify_slurm.yml
