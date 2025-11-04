@@ -1,0 +1,47 @@
+---
+- name: Initialize BeeGFS management daemon
+  hosts: control
+  become: true
+  tags:
+    - management
+    - init
+  tasks:
+    - name: Run beegfs-mgmtd --init
+      command: /opt/beegfs/sbin/beegfs-mgmtd --init
+      args:
+        creates: /var/lib/beegfs/mgmtd # optional, prevents re-running if already initialized
+      register: mgmtd_init
+
+    - name: Display beegfs-mgmtd init output
+      debug:
+        var: mgmtd_init.stdout
+
+- name: Start BeeGFS management daemon
+  hosts: control
+  become: true
+  tags:
+    - management
+    - start
+  tasks:
+    - name: Start beegfs-mgmtd service
+      systemd:
+        name: beegfs-mgmtd
+        state: started
+        enabled: yes
+
+
+- name: Check BeeGFS manager status
+  hosts: control
+  become: true
+  tags:
+    - management
+    - status
+  tasks:
+    - name: List connected BeeGFS nodes
+      command: /opt/beegfs/sbin/beegfs-node list --mgmtd-addr node1:8010
+      register: beegfs_nodes
+      ignore_errors: yes
+
+    - name: Display connected BeeGFS nodes
+      debug:
+        msg: "{{ beegfs_nodes.stdout }}"

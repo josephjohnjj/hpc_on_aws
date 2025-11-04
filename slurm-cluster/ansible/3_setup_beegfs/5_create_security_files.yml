@@ -1,0 +1,140 @@
+---
+
+- name: Prepare BeeGFS security files on all nodes
+  hosts: all
+  become: true
+  tags:
+    - security
+    - setup
+  tasks:
+    - name: Ensure /etc/beegfs directory exists
+      file:
+        path: /etc/beegfs
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      tags:
+        - beegfs_dir
+
+    - name: Create BeeGFS conn.auth file
+      copy:
+        dest: /etc/beegfs/conn.auth
+        content: "abc123!"
+        owner: root
+        group: root
+        mode: "0600"
+      tags:
+        - auth_file
+
+
+- name: Generate self-signed BeeGFS TLS certificate on control node
+  hosts: control
+  become: true
+  tags:
+    - security
+    - tls
+  tasks:
+    - name: Generate self-signed TLS certificate and key
+      command: >
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048
+        -keyout /etc/beegfs/key.pem
+        -out /etc/beegfs/cert.pem
+        -subj "/C=US/ST=State/L=City/O=BeeGFS/OU=IT/CN=beegfs.local"
+      args:
+        creates: /etc/beegfs/cert.pem
+      tags:
+        - gen_cert
+
+    - name: Set permissions on cert and key
+      file:
+        path: "{{ item.path }}"
+        owner: root
+        group: root
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: /etc/beegfs/cert.pem, mode: "0644" }
+        - { path: /etc/beegfs/key.pem, mode: "0600" }
+      tags:
+        - gen_cert
+
+# 3. Fetch TLS cert/key to localhost and distribute to all nodes
+- name: Distribute BeeGFS TLS certificates from control node to all other nodes
+  hosts: all
+  become: true
+  vars:
+    cert_source: /etc/beegfs/cert.pem
+    key_source: /etc/beegfs/key.pem
+    cert_dest: /etc/beegfs/cert.pem
+    key_dest: /etc/beegfs/key.pem
+    cert_local_tmp: "{{ playbook_dir }}/certificates"  # local folder on machine running Ansible
+  tags:
+    - security
+    - tls
+  tasks:
+
+    - name: Ensure local certificates directory exists
+      delegate_to: localhost
+      run_once: true
+      become: false
+      file:
+        path: "{{ cert_local_tmp }}"
+        state: directory
+        mode: '0755'
+
+    - name: Fetch cert.pem from node1 to localhost
+      fetch:
+        src: "{{ cert_source }}"
+        dest: "{{ cert_local_tmp }}/cert.pem"
+        flat: true
+      when: inventory_hostname == "node1"
+      run_once: true
+
+    - name: Fetch key.pem from node1 to localhost
+      fetch:
+        src: "{{ key_source }}"
+        dest: "{{ cert_local_tmp }}/key.pem"
+        flat: true
+      when: inventory_hostname == "node1"
+      run_once: true
+
+    - name: Set cert/key local path facts
+      set_fact:
+        local_cert_path: "{{ cert_local_tmp }}/cert.pem"
+        local_key_path: "{{ cert_local_tmp }}/key.pem"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Copy cert.pem to all other nodes
+      copy:
+        src: "{{ local_cert_path }}"
+        dest: "{{ cert_dest }}"
+        owner: root
+        group: root
+        mode: '0644'
+      when: inventory_hostname != "node1"
+
+    - name: Copy key.pem to all other nodes
+      copy:
+        src: "{{ local_key_path }}"
+        dest: "{{ key_dest }}"
+        owner: root
+        group: root
+        mode: '0600'
+      when: inventory_hostname != "node1"
+
+    - name: Compute SHA256 hash of cert.pem
+      command: sha256sum {{ cert_dest }}
+      register: cert_hash
+
+    - name: Print SHA256 hash of cert.pem
+      debug:
+        msg: "Node {{ inventory_hostname }} cert.pem SHA256: {{ cert_hash.stdout }}"
+
+    - name: Compute SHA256 hash of key.pem
+      command: sha256sum {{ key_dest }}
+      register: key_hash
+
+    - name: Print SHA256 hash of key.pem
+      debug:
+        msg: "Node {{ inventory_hostname }} key.pem SHA256: {{ key_hash.stdout }}"

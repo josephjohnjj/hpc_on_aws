@@ -1,0 +1,35 @@
+---
+- name: Start BeeGFS client service on compute and login nodes
+  hosts:
+    - compute
+    - login
+  become: true
+  tags:
+    - client
+    - start
+  tasks:
+    - name: Start beegfs-client service
+      systemd:
+        name: beegfs-client
+        state: started
+        enabled: yes
+
+
+- name: List connected BeeGFS client nodes from controller
+  hosts: control
+  become: true
+  tags:
+    - client
+    - list
+  tasks:
+    - name: List BeeGFS client nodes
+      command: /opt/beegfs/sbin/beegfs node list --mgmtd-addr node1:8010 --node-type client
+      register: client_nodes
+      ignore_errors: yes
+
+    - name: Display connected BeeGFS client nodes
+      debug:
+        msg: "{{ client_nodes.stdout }}"
+
+
+    

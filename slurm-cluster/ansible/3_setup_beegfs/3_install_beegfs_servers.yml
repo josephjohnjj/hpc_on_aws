@@ -1,0 +1,79 @@
+---
+
+- name: Install BeeGFS management service on management node
+  hosts: control
+  become: true
+  tags:
+    - management
+    - install
+  tasks:
+    - name: Install BeeGFS management daemon
+      dnf:
+        name: beegfs-mgmtd
+        state: present
+      tags:
+        - management
+        - install
+
+    - name: Install BeeGFS CLI tools
+      dnf:
+        name: beegfs-tools
+        state: present
+      tags:
+        - management
+        - install
+
+    
+
+- name: Install BeeGFS storage and meta services on storage nodes
+  hosts: storage
+  become: true
+  tags:
+    - storage
+    - install
+  tasks:
+    - name: Install BeeGFS metadata daemon
+      dnf:
+        name: beegfs-meta
+        state: present
+      tags:
+        - storage
+        - install
+
+    - name: Install BeeGFS storage daemon
+      dnf:
+        name: beegfs-storage
+        state: present
+      tags:
+        - storage
+        - install
+
+    - name: Install BeeGFS CLI tools
+      dnf:
+        name: beegfs-tools
+        state: present
+      tags:
+        - storage
+        - install
+
+
+- name: Install BeeGFS client on login and compute nodes
+  hosts:
+    - login
+    - compute
+  become: true
+  tags:
+    - client
+    - install
+  tasks:
+    - name: Install BeeGFS client and kernel headers
+      dnf:
+        name:
+          - beegfs-client
+          - kernel-devel
+        state: present
+      tags:
+        - client
+        - install
+
+
