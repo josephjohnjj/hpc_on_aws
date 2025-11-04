@@ -36,6 +36,12 @@ BeeGFS Installation
 The first important thing here is to make sure that the OS is compatible with the BeeGFS versions
 we are using. Or else this could cause issues when installing the BeeGFS client.
 
+In this we are using the following versions:
+
+* BeeGFS version 8.2.x
+
+* RHEL 10
+
 Directory setup
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -57,8 +63,10 @@ Format the disk and mount it to `/BeeGFS`.
     sudo mount /dev/nvme1n1 /BeeGFS
     sudo systemctl daemon-reload
 
-Once loaded you can check the mount using `df -h` command. Craete  a directory `management` inside
-`/BeeGFS` to hold the management server data.
+Once loaded you can check the mount using `df -h` command. 
+
+ 
+Create  a directory `management` inside `/BeeGFS` to hold the management server data.
 
 .. code-block:: bash
     
@@ -123,7 +131,7 @@ Install BeeGFS Management Service
     sudo dnf install beegfs-mgmtd
 
 Setup BeeGFS Management Service. The `sbin` directory contains the executables needed for 
-setting up and managing BeeGFS.
+setting up and managing BeeGFS. **In the older you have to do this**: 
 
 .. code-block:: bash
 
@@ -154,7 +162,38 @@ Set the the parameter `connAuthFile`.
     sudo vi beegfs-mgmtd.conf
     connAuthFile = /etc/beegfs/AuthFile
 
-Restart and Verify the Service
+
+
+
+**In the new BeeGFS the things are bit different**. The management configurations are now
+available in `/etc/beegfs/beegfs-mgmtd.toml`. The connection file by default is
+`/etc/beegfs/conn.auth`. **We will be follwing ghe new way here**. make sure to add the secret
+key to the `conn.auth` file.
+
+
+The management service also used a proper database (SQLite) for improved robustness and to 
+support more advanced features. The current initialization command for the BeeGFS management 
+service is:
+
+.. code-block:: bash
+
+    sudo /opt/beegfs/sbin/beegfs-mgmtd --init
+
+We also need to create a TSL certificate for secure communication. This can be done using the
+following command:
+
+.. code-block:: bash
+
+    sudo mkdir -p /etc/beegfs
+    sudo openssl req -x509 -newkey rsa:4096 -nodes -sha256   -keyout key.pem -out cert.pem  \ 
+        -days 3650   -subj "/CN=node1"   \ 
+        -addext "subjectAltName=DNS:node1,IP:$(hostname -I | awk '{print $1}')"
+
+    sudo chmod 600 /etc/beegfs/key.pem
+    sudo chmod 644 /etc/beegfs/cert.pem
+    sudo chown root:root /etc/beegfs/key.pem /etc/beegfs/cert.pem
+
+Note this key and certificate has to be copied to all other nodes in the cluster.
 
 .. code-block:: bash
 
@@ -171,13 +210,22 @@ You can also check the logs for any errors.
 
 Ensure the firewall allows necessary ports for BeeGFS communication.
 
+
+Check if the management service is running without errors.
+
+.. code-block:: bash
+
+    sudo beegfs node list --mgmtd-addr node1:8010
+
+
+
 Configure Metadata server
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There are two metadata servers (node 6 and node7) in this design. The metadata server is
 co-located with the storage server.
 
- Install BeeGFS Metadata Service
+Install BeeGFS Metadata Service
 
 .. code-block:: bash
 
@@ -210,7 +258,8 @@ Configure Authentication File
 .. code-block:: bash
 
     sudo vi beegfs-mgmtd.conf
-    connAuthFile = /etc/beegfs/AuthFile
+    connAuthFile = /etc/beegfs/conn.auth
+    sysMgmtdHost = node1
 
 
 Edit the `beegfs-meta.conf` file to set the configuration parameters for the metadata service.
@@ -224,6 +273,12 @@ Start and Check Metadata Service
     sudo systemctl status beegfs-meta
 
 This should be done on both metadata servers.
+
+Make sure the metadata servers are registered with the management server.
+
+.. code-block:: bash
+
+    sudo beegfs node list --mgmtd-addr node1:8010 --node-type meta
 
 Storage Server Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -264,8 +319,8 @@ In this case each daemon has two storage targets.
 .. code-block:: bash
 
     cd /opt/beegfs/sbin/
-    ./beegfs-setup-storage -p /storage/stor1 -s 1 -i 101 -m node1
-    ./beegfs-setup-storage -p /storage/stor1 -s 1 -i 102 -m node1
+    sudo ./beegfs-setup-storage -p /storage/stor1 -s 1 -i 101 -m node1
+    sudo ./beegfs-setup-storage -p /storage/stor2 -s 1 -i 102 -m node1
 
 * `-p /storage/stor1` : Specifies the storage target path.
 * `-s 1` : Assigns the storage server ID.
@@ -277,8 +332,8 @@ On the second storage node this will be:
 .. code-block:: bash
 
     cd /opt/beegfs/sbin/
-    ./beegfs-setup-storage -p /storage/stor2 -s 2 -i 201 -m node1
-    ./beegfs-setup-storage -p /storage/stor2 -s 2 -i 202 -m node1
+    sudo ./beegfs-setup-storage -p /storage/stor1 -s 2 -i 201 -m node1
+    sudo ./beegfs-setup-storage -p /storage/stor2 -s 2 -i 202 -m node1
 
 
 It is a convention for the target index to start with the storage server ID followed by a 
@@ -292,6 +347,83 @@ Start the BeeGFS Storage Service
     sudo systemctl status beegfs-storage
 
 This should be done for all storage servers.
+
+Go to the management node and check if the storage servers are registered correctly.
+
+.. code-block:: bash
+
+    sudo beegfs node list --mgmtd-addr node1:8010 --node-type storage
+
+Install BeeGFS Client and Dependencies
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: bash
+
+    sudo dnf install beegfs-client kernel-devel
+
+The `beegfs-helperd` package was removed in BeeGFS version 8.0.0 and later releases.
+
+
+
+Set the foollowing parameters in `beegfs-client.conf` file:
+
+
+.. code-block:: bash
+
+    sysMgmtdHost  = node1
+    connAuthFile  = /etc/beegfs/conn.auth
+
+
+Set the following parameters in `beegfs-mounts.conf` file:
+
+.. code-block:: bash
+
+    /scratch /etc/beegfs/beegfs-client.conf
+
+1. `/etc/beegfs/beegfs-mounts.conf` defines filesystems the client should automatically mount, 
+along with their configuration. `/scratch` - Mount point on the local client node. This is where 
+the BeeGFS filesystem will  appear in the directory tree. You must create it first 
+(`mkdir -p /scratch`).
+
+2. `/etc/beegfs/beegfs-client.conf`: Path to the client configuration file for this mount. 
+This tells the client: which mgmtd server to contact etc.
+
+.. code-block:: bash
+
+    sudo mkdir -p /scratch
+
+
+Start the BeeGFS Client Service
+
+.. code-block:: bash
+
+    sudo systemctl start beegfs-client
+    sudo systemctl status beegfs-client
+
+
+Repeat the same in other client nodes. Then check if the clinets are registered with the 
+management server.
+
+.. code-block:: bash
+
+    sudo beegfs node list --mgmtd-addr node1:8010 --node-type client
+
+
+The to test of everything is working fine crearte
+a test file in the `/scratch` directory from any client node and check if it is visible
+from other client nodes.
+
+.. code-block:: bash
+
+    ssh node3
+    touch /scratch/testfile_from_node3.txt
+    ssh node4
+    ls /scratch/
+
+
+
+
+
 
 
 
