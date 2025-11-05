@@ -10,7 +10,7 @@ The design for the slurm cluster is as follows:
 4. Two Storage nodes (node6, node7)
 
 Initial packages to install on all nodes
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------------------
 
 Make sure the following packages are installed on all nodes:
 
@@ -141,6 +141,8 @@ versions. Below are the steps to configure the newer version of BeeGFS.
 Configure Management Node
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Install BeeGFS utilities on all nodes (management, storage, and client nodes):
+
 
 Install BeeGFS Management Service
 
@@ -224,7 +226,7 @@ Verify that the management service is running properly and without errors:
 .. code-block:: bash
 
 
-    sudo beegfs node list --mgmtd-addr node1:8010
+    sudo /opt/beegfs/sbin/beegfs node list --mgmtd-addr node1:8010
 
 
 
@@ -253,8 +255,7 @@ Set up the BeeGFS Metadata Service:
 
 .. code-block:: bash
 
-    cd /opt/beegfs/sbin/
-    ./beegfs-setup-meta -p /BeeGFS/metadata/ -s 1 -m node1
+    /opt/beegfs/sbin/beegfs-setup-meta -p /BeeGFS/metadata/ -s 1 -m node1
 
 * `-p /BeeGFS/metadata/`` : Specifies the metadata storage path.
 
@@ -296,7 +297,7 @@ properly registered with the management server.
 
 .. code-block:: bash
 
-    sudo beegfs node list --mgmtd-addr node1:8010 --node-type meta
+    sudo /opt/beegfs/sbin/beegfs node list --mgmtd-addr node1:8010 --node-type meta
 
 Storage Server Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -329,9 +330,8 @@ two storage targets.
 
 .. code-block:: bash
 
-    cd /opt/beegfs/sbin/
-    sudo ./beegfs-setup-storage -p /storage/stor1 -s 1 -i 101 -m node1
-    sudo ./beegfs-setup-storage -p /storage/stor2 -s 1 -i 102 -m node1
+    sudo /opt/beegfs/sbin/beegfs-setup-storage -p /storage/stor1 -s 1 -i 101 -m node1
+    sudo /opt/beegfs/sbin/beegfs-setup-storage -p /storage/stor2 -s 1 -i 102 -m node1
 
 * `-p /storage/stor1` : Specifies the storage target path.
 * `-s 1` : Assigns the storage server ID.
@@ -342,9 +342,8 @@ On the second storage node this will be:
 
 .. code-block:: bash
 
-    cd /opt/beegfs/sbin/
-    sudo ./beegfs-setup-storage -p /storage/stor1 -s 2 -i 201 -m node1
-    sudo ./beegfs-setup-storage -p /storage/stor2 -s 2 -i 202 -m node1
+    sudo /opt/beegfs/sbin/beegfs-setup-storage -p /storage/stor1 -s 2 -i 201 -m node1
+    sudo /opt/beegfs/sbin/beegfs-setup-storage -p /storage/stor2 -s 2 -i 202 -m node1
 
 
 
@@ -365,7 +364,7 @@ storage servers are correctly registered.
 
 .. code-block:: bash
 
-    sudo beegfs node list --mgmtd-addr node1:8010 --node-type storage
+    sudo /opt/beegfs/sbin/beegfs node list --mgmtd-addr node1:8010 --node-type storage
 
 Install BeeGFS Client and Dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -401,8 +400,7 @@ mount, along with their configuration. `/scratch` is the mount point on the loca
 where the BeeGFS filesystem will appear in the directory tree. You must create this directory 
 first:
 
-   .. code-block:: bash
-
+.. code-block:: bash
 
     mkdir -p /scratch
  
@@ -445,34 +443,296 @@ client nodes.
     ls /scratch/
 
 
+OpenLDAP Server and SSSD Client Integration
+----------------------------
+
+
+The OpenLDAP server is on a control node and and LDAP clients are on login and compute nodes.
+
+OpenLDAP Server (Control Node)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install LDAP packages:
+
+.. code-block:: bash
+
+    sudo dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(rpm -E %rhel).noarch.rpm -y
+    sudo dnf install epel-release -y
+    sudo dnf install openldap-servers openldap-clients -y
+    sudo dnf install vim -y
+
+
+Enable and start LDAP service: 
+
+.. code-block:: bash
+
+    sudo systemctl enable --now slapd
+    sudo systemctl status slapd
+
+
+Load standard schemas:
+
+
+.. code-block:: bash
+
+    sudo ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/core.ldif
+    sudo ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/cosine.ldif
+    sudo ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/inetorgperson.ldif
+    sudo ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/nis.ldif
+
+
+Generate admin password hash:
+
+.. code-block:: bash
+
+    slappasswd
+
+
+Copy the hash for the next step (example: `{SSHA}bS9h9bbVyVyccwYhO9Xt2Jz9JepWZc5E`).
+
+Configure database suffix, root DN, and password:
+
+Create `/root/db_config.ldif`:
+
+.. code-block:: bash
+
+
+    dn: olcDatabase={2}mdb,cn=config
+    changetype: modify
+    replace: olcSuffix
+    olcSuffix: dc=ncitraininf,dc=local
+    -
+    replace: olcRootDN
+    olcRootDN: cn=admin,dc=ncitraininf,dc=local
+    -
+    replace: olcRootPW
+    olcRootPW: {SSHA}bS9h9bbVyVyccwYhO9Xt2Jz9JepWZc5E
+
+
+Apply:
+
+.. code-block:: bash
+
+    sudo ldapmodify -Y EXTERNAL -H ldapi:/// -f /root/db_config.ldif
+
+
+Create base domain `/root/domain.ldif`:
+
+.. code-block:: bash
+
+    dn: dc=ncitraininf,dc=local
+    objectClass: top
+    objectClass: dcObject
+    objectClass: organization
+    o: NCI Training
+    dc: ncitraininf
+
+
+Add:
+
+
+.. code-block:: bash
+
+    ldapadd -x -D "cn=admin,dc=ncitraininf,dc=local" -W -f /root/domain.ldif
+
+
+Create organizational units `/root/base.ldif`:
+
+.. code-block:: bash
+
+    dn: ou=People,dc=ncitraininf,dc=local
+    objectClass: organizationalUnit
+    ou: People
+
+    dn: ou=Groups,dc=ncitraininf,dc=local
+    objectClass: organizationalUnit
+    ou: Groups
+
+
+
+Add:
+
+.. code-block:: bash
+
+    ldapadd -x -D "cn=admin,dc=ncitraininf,dc=local" -W -f /root/base.ldif
+
+
+and `/root/people.ldif`:
+
+.. code-block:: bash
+
+    dn: ou=People,dc=ncitraininf,dc=local
+    objectClass: organizationalUnit
+    ou: People
+
+
+Add:
+
+.. code-block:: bash
+
+    sudo ldapadd -x -D "cn=admin,dc=ncitraininf,dc=local" -W -f /root/people.ldif
+
+
+Add a test group `/root/group.ldif`:
+
+.. code-block:: bash
+
+    dn: cn=training,ou=Groups,dc=ncitraininf,dc=local
+    objectClass: posixGroup
+    cn: training
+    gidNumber: 10000
+
+
+Add:
+
+.. code-block:: bash
+
+    ldapadd -x -D "cn=admin,dc=ncitraininf,dc=local" -W -f /root/group.ldif
+
+
+Add a test user `/root/user.ldif`:
+
+.. code-block:: bash
+
+    dn: uid=john,ou=People,dc=ncitraininf,dc=local
+    objectClass: inetOrgPerson
+    objectClass: posixAccount
+    objectClass: shadowAccount
+    cn: John
+    sn: Doe
+    uid: john
+    uidNumber: 10000
+    gidNumber: 10000
+    homeDirectory: /home/john
+    loginShell: /bin/bash
+    userPassword: {SSHA}<hash-from-slappasswd>
+
+
+Add:
+
+.. code-block:: bash
+
+    ldapadd -x -D "cn=admin,dc=ncitraininf,dc=local" -W -f /root/user.ldif
+
+
+Verify entries
+
+.. code-block:: bash
+
+    ldapsearch -x -b dc=ncitraininf,dc=local
 
 
 
 
+LDAP Clients (Login / Compute Nodes)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install SSSD and tools
+
+.. code-block:: bash
+
+    sudo dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(rpm -E %rhel).noarch.rpm
+    sudo dnf install epel-release -y
+    sudo dnf install sssd sssd-ldap sssd-tools oddjob-mkhomedir -y
 
 
+Create `/etc/sssd/sssd.conf`
+
+.. code-block:: bash
+
+    [sssd]
+    services = nss, pam
+    domains = ldap
+
+    [domain/ldap]
+    id_provider = ldap
+    auth_provider = ldap
+    ldap_uri = ldap://10.0.1.170
+    ldap_search_base = dc=ncitraininf,dc=local
+    ldap_default_bind_dn = cn=admin,dc=ncitraininf,dc=local
+    ldap_default_authtok_type = password
+    ldap_default_authtok = ldappassword
+    cache_credentials = True
+    enumerate = True
+    fallback_homedir = /home/%u
+    ldap_tls_reqcert = never
+    ldap_id_use_start_tls = False
+    debug_level = 9
+
+    ldap_schema = rfc2307
+    ldap_user_object_class = inetOrgPerson
+    ldap_group_object_class = posixGroup
+    ldap_user_search_base = dc=ncitraininf,dc=local
+    ldap_group_search_base = dc=ncitraininf,dc=local
+    ldap_user_search_filter = (objectClass=inetOrgPerson)
+    ldap_group_search_filter = (objectClass=posixGroup)
+
+Set permissions:
+
+.. code-block:: bash
+
+    sudo chmod 600 /etc/sssd/sssd.conf
+    sudo chown root:root /etc/sssd/sssd.conf
 
 
+Configure Name Service Switch:
+
+Edit `/etc/nsswitch.conf`:
+
+.. code-block:: bash
+
+    # Generated by authselect
+    # Do not modify this file manually, use authselect instead. Any user changes will be overwritten.
+    # You can stop authselect from managing your configuration by calling 'authselect opt-out'.
+    # See authselect(8) for more details.
+
+    # In order of likelihood of use to accelerate lookup.
+
+    passwd:     files sss
+    shadow:     files sss
+    group:      files sss
+    hosts:      files dns myhostname
+    services:   files
+    netgroup:   files
+    automount:  files
+
+    aliases:    files
+    ethers:     files
+    gshadow:    files
+    networks:   files dns
+    protocols:  files
+    publickey:  files
+    rpc:        files
 
 
+Enable automatic home directories
+
+.. code-block:: bash
+
+    sudo authselect enable-feature with-mkhomedir
+    sudo authselect apply-changes
 
 
+Clear old SSSD cache:
+
+.. code-block:: bash
+
+    sudo systemctl stop sssd
+    sudo sss_cache -E
 
 
+Enable and start SSSD
+
+.. code-block:: bash
+
+    sudo systemctl enable --now sssd
+    sudo systemctl status sssd
 
 
+Test LDAP connectivity and user lookup
 
+.. code-block:: bash
 
-
-
-
-
-
-
-
-
-
-
-
-
+    getent passwd john
+    ldapsearch -x -H ldap://<LDAP_SERVER_IP> -D "cn=admin,dc=ncitraininf,dc=local" -W -b dc=ncitraininf,dc=local
 
