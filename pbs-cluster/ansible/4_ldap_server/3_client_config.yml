@@ -1,0 +1,54 @@
+---
+- name: Install and configure LDAP client on login and compute nodes
+  hosts: login,compute
+  become: yes
+  vars:
+    ldap_server_ip: >-
+      {{ hostvars[groups['control'][0]]['ansible_host']
+         | default(hostvars[groups['control'][0]]['ansible_default_ipv4']['address']) }}
+    ldap_base_dn: "dc=ncitraininf,dc=local"
+
+  tasks:
+    - name: Install LDAP client packages
+      dnf:
+        name:
+          - openldap-clients
+          - nss-pam-ldapd
+          - nss-pam-ldapd-compat
+        state: present
+      tags: ldap-client,install
+
+    - name: Configure /etc/nslcd.conf
+      copy:
+        dest: /etc/nslcd.conf
+        content: |
+          uid nslcd
+          gid nslcd
+          uri ldap://{{ ldap_server_ip }}
+          base {{ ldap_base_dn }}
+          bind_timelimit 5
+          timelimit 15
+          reconnect_sleeptime 1
+          reconnect_retrytime 5
+          reconnect_maxconntries 5
+          ssl no
+        mode: "0644"
+      tags: ldap-client,config
+
+    - name: Configure /etc/nsswitch.conf to use ldap
+      lineinfile:
+        path: /etc/nsswitch.conf
+        regexp: "^({{ item.key }}:).*"
+        line: "{{ item.key }}: files ldap"
+      loop:
+        - { key: passwd }
+        - { key: group }
+        - { key: shadow }
+      tags: ldap-client,config
+
+    - name: Enable and restart nslcd service
+      systemd:
+        name: nslcd
+        state: restarted
+        enabled: yes
+      tags: ldap-client,service

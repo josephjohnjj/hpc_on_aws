@@ -1,0 +1,59 @@
+---
+- name: Install and configure OpenLDAP server on control node
+  hosts: control
+  become: yes
+  vars:
+    ldap_domain: "ncitraininf.local"
+    ldap_organization: "NCI Training"
+    ldap_admin_password: "Nci@Kambri"
+    ldap_base_dn: "dc=ncitraininf,dc=local"
+    ldap_root_dn: "cn=admin,{{ ldap_base_dn }}"
+
+  tasks:
+    - name: Install OpenLDAP server and utilities
+      dnf:
+        name:
+          - openldap-servers
+          - openldap-clients
+          - policycoreutils-python-utils
+        state: present
+      tags: ldap-server,install
+
+    - name: Enable and start slapd service
+      systemd:
+        name: slapd
+        state: started
+        enabled: yes
+      tags: ldap-server,service
+
+    - name: Set LDAP root password
+      shell: |
+        slappasswd -s "{{ ldap_admin_password }}" > /tmp/ldap_admin_pass
+      args:
+        creates: /tmp/ldap_admin_pass
+      tags: ldap-server,password
+
+    - name: Create LDIF for root password and basic domain
+      copy:
+        dest: /tmp/base.ldif
+        content: |
+          dn: {{ ldap_base_dn }}
+          objectClass: top
+          objectClass: dcObject
+          objectClass: organization
+          o: {{ ldap_organization }}
+          dc: {{ ldap_domain.split('.')[0] }}
+
+          dn: {{ ldap_root_dn }}
+          objectClass: simpleSecurityObject
+          objectClass: organizationalRole
+          cn: admin
+          description: LDAP administrator
+          userPassword: {{ lookup('file', '/tmp/ldap_admin_pass') }}
+      tags: ldap-server,config
+
+    - name: Add base domain to LDAP
+      command: ldapadd -Y EXTERNAL -H ldapi:/// -f /tmp/base.ldif
+      args:
+        creates: "/var/lib/ldap/{{ ldap_domain.split('.')[0] }}.ldif"
+      tags: ldap-server,config
