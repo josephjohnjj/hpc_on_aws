@@ -57,10 +57,40 @@ resource "aws_instance" "control_node" {
   # Configure root volume
   root_block_device {
     volume_type           = "gp3" # Use gp3 for improved performance and cost control
-    volume_size           = 300   # 300 GiB
+    volume_size           = 50    # 300 GiB
     iops                  = 3000  # Provisioned IOPS (default for gp3 is 3000)
     encrypted             = false # Set to false for unencrypted volume (default is false)
     delete_on_termination = true  # Deletes the volume when the instance is terminated
+  }
+
+  # First additional disk for /BeeGFS (metadata + management)
+  ebs_block_device {
+    device_name           = "/dev/sdf" # Linux will map this to /dev/nvme1n1 on newer instances
+    volume_type           = "gp3"
+    volume_size           = 50 # Size in GiB
+    iops                  = 3000
+    encrypted             = false
+    delete_on_termination = true
+  }
+
+  # Second additional disk for /storage/stor1
+  ebs_block_device {
+    device_name           = "/dev/sdg"
+    volume_type           = "gp3"
+    volume_size           = 50
+    iops                  = 3000
+    encrypted             = false
+    delete_on_termination = true
+  }
+
+  # Third additional disk for /storage/stor2
+  ebs_block_device {
+    device_name           = "/dev/sdh"
+    volume_type           = "gp3"
+    volume_size           = 50
+    iops                  = 3000
+    encrypted             = false
+    delete_on_termination = true
   }
 
 
@@ -135,7 +165,7 @@ resource "aws_instance" "login_node" {
   # Configure root volume
   root_block_device {
     volume_type           = "gp3" # Use gp3 for improved performance and cost control
-    volume_size           = 300   # 300 GiB
+    volume_size           = 50    # 300 GiB
     iops                  = 3000  # Provisioned IOPS (default for gp3 is 3000)
     encrypted             = false # Set to false for unencrypted volume (default is false)
     delete_on_termination = true  # Deletes the volume when the instance is terminated
@@ -211,10 +241,19 @@ resource "aws_instance" "compute_node" {
   # Configure root volume
   root_block_device {
     volume_type           = "gp3" # Use gp3 for improved performance and cost control
-    volume_size           = 300   # 300 GiB
+    volume_size           = 50    # 300 GiB
     iops                  = 3000  # Provisioned IOPS (default for gp3 is 3000)
     encrypted             = false # Set to false for unencrypted volume (default is false)
     delete_on_termination = true  # Deletes the volume when the instance is terminated
+  }
+
+  ebs_block_device {
+    device_name           = "/dev/sdf" # Linux will map this to /dev/nvme1n1 on newer instances
+    volume_type           = "gp3"
+    volume_size           = 50 # Size in GiB
+    iops                  = 3000
+    encrypted             = false
+    delete_on_termination = true
   }
 
 
@@ -288,10 +327,40 @@ resource "aws_instance" "storage_node" {
   # Configure root volume
   root_block_device {
     volume_type           = "gp3" # Use gp3 for improved performance and cost control
-    volume_size           = 300   # 300 GiB
+    volume_size           = 50    # 300 GiB
     iops                  = 3000  # Provisioned IOPS (default for gp3 is 3000)
     encrypted             = false # Set to false for unencrypted volume (default is false)
     delete_on_termination = true  # Deletes the volume when the instance is terminated
+  }
+
+  # First additional disk for /BeeGFS (metadata + management)
+  ebs_block_device {
+    device_name           = "/dev/sdf" # Linux will map this to /dev/nvme1n1 on newer instances
+    volume_type           = "gp3"
+    volume_size           = 50 # Size in GiB
+    iops                  = 3000
+    encrypted             = false
+    delete_on_termination = true
+  }
+
+  # Second additional disk for /storage/stor1
+  ebs_block_device {
+    device_name           = "/dev/sdg"
+    volume_type           = "gp3"
+    volume_size           = 50
+    iops                  = 3000
+    encrypted             = false
+    delete_on_termination = true
+  }
+
+  # Third additional disk for /storage/stor2
+  ebs_block_device {
+    device_name           = "/dev/sdh"
+    volume_type           = "gp3"
+    volume_size           = 50
+    iops                  = 3000
+    encrypted             = false
+    delete_on_termination = true
   }
 
 

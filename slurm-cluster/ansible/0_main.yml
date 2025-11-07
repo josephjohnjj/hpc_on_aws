@@ -1,0 +1,10 @@
+---
+- import_playbook: 1_initial_setup.yml
+- import_playbook: 2_setup_ssh_keys.yml
+- import_playbook: 3_setup_hostnames.yml
+- import_playbook: 4_append_keys.yml
+- import_playbook: 5_setup_munge.yml
+- import_playbook: 6_distribute_munge_key.yml
+- import_playbook: 7_install_slurm.yml
+- import_playbook: 8_distribute_slurm_conf.yml
+- import_playbook: 9_slurm_finalize.yml

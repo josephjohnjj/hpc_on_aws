@@ -1,0 +1,214 @@
+---
+
+- name: Install and start OpenLDAP on head node
+  hosts: control
+  become: yes
+  tags:
+    - ldap
+  tasks:
+
+    - name: Install OpenLDAP server and client packages
+      ansible.builtin.dnf:
+        name:
+          - openldap-servers
+          - openldap-clients
+        state: present
+      tags:
+        - ldap_server_install
+
+    - name: Enable and start slapd service
+      ansible.builtin.systemd:
+        name: slapd
+        state: started
+        enabled: yes
+      tags:
+        - ldap_service
+
+    - name: Check slapd service status
+      ansible.builtin.systemd:
+        name: slapd
+        state: started
+      register: slapd_status
+      tags:
+        - ldap_service
+
+    - name: Show slapd status
+      ansible.builtin.debug:
+        var: slapd_status
+      tags:
+        - ldap_service
+
+- name: Prepare LDAP files and hash
+  hosts: control
+  become: yes
+  vars:
+    ldap_root_password: "ldappassword"
+    ldap_files_dir: "/home/rocky/ldap_files"
+    ldap_root_hash_file: "{{ ldap_files_dir }}/ldasphash"
+  tasks:
+
+    - name: Ensure LDAP files directory exists
+      ansible.builtin.file:
+        path: "{{ ldap_files_dir }}"
+        state: directory
+        owner: rocky
+        group: rocky
+        mode: '0755'
+      tags:
+        - prepare_dir
+
+    - name: Generate LDAP root password hash
+      ansible.builtin.command:
+        cmd: "slappasswd -s {{ ldap_root_password }}"
+      register: ldap_root_hash
+      changed_when: false
+      tags:
+        - generate_hash
+
+    - name: Save LDAP root password hash
+      ansible.builtin.copy:
+        content: "{{ ldap_root_hash.stdout }}"
+        dest: "{{ ldap_root_hash_file }}"
+        owner: root
+        group: root
+        mode: '0600'
+      tags:
+        - generate_hash
+
+- name: Add NIS schema (required for posixAccount/posixGroup)
+  hosts: control
+  become: yes
+  tags:
+    - ldap_schema
+  tasks:
+    - name: Add NIS schema
+      ansible.builtin.command:
+        cmd: "ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/nis.ldif"
+      ignore_errors: yes
+      tags:
+        - schemas
+
+- name: Configure LDAP domain, OUs, group, and user
+  hosts: control
+  become: yes
+  vars:
+    ldap_admin_dn: "cn=admin,dc=ncitraininf,dc=local"
+    ldap_root_password: "ldappassword"
+    ldap_files_dir: "/home/rocky/ldap_files"
+    domain_file: "{{ ldap_files_dir }}/domain.ldif"
+    base_file: "{{ ldap_files_dir }}/base.ldif"
+    group_file: "{{ ldap_files_dir }}/group.ldif"
+    user_file: "{{ ldap_files_dir }}/user.ldif"
+    ldap_root_hash_file: "{{ ldap_files_dir }}/ldasphash"
+  tasks:
+
+    - name: Create domain.ldif
+      ansible.builtin.copy:
+        dest: "{{ domain_file }}"
+        content: |
+          dn: dc=ncitraininf,dc=local
+          objectClass: top
+          objectClass: dcObject
+          objectClass: organization
+          o: NCI Training
+          dc: ncitraininf
+        owner: root
+        group: root
+        mode: '0644'
+      tags:
+        - domain
+
+    - name: Add base domain
+      ansible.builtin.command:
+        cmd: "ldapadd -x -D '{{ ldap_admin_dn }}' -w {{ ldap_root_password }} -f {{ domain_file }}"
+      ignore_errors: yes
+      tags:
+        - domain
+
+    - name: Create base.ldif for OUs
+      ansible.builtin.copy:
+        dest: "{{ base_file }}"
+        content: |
+          dn: ou=People,dc=ncitraininf,dc=local
+          objectClass: organizationalUnit
+          ou: People
+
+          dn: ou=Groups,dc=ncitraininf,dc=local
+          objectClass: organizationalUnit
+          ou: Groups
+        owner: root
+        group: root
+        mode: '0644'
+      tags:
+        - organizational_units
+
+    - name: Add organizational units
+      ansible.builtin.command:
+        cmd: "ldapadd -x -D '{{ ldap_admin_dn }}' -w {{ ldap_root_password }} -f {{ base_file }}"
+      ignore_errors: yes
+      tags:
+        - organizational_units
+
+    - name: Create group.ldif
+      ansible.builtin.copy:
+        dest: "{{ group_file }}"
+        content: |
+          dn: cn=training,ou=Groups,dc=ncitraininf,dc=local
+          objectClass: posixGroup
+          cn: training
+          gidNumber: 10000
+        owner: root
+        group: root
+        mode: '0644'
+      tags:
+        - groups
+
+    - name: Add test group
+      ansible.builtin.command:
+        cmd: "ldapadd -x -D '{{ ldap_admin_dn }}' -w {{ ldap_root_password }} -f {{ group_file }}"
+      ignore_errors: yes
+      tags:
+        - groups
+
+    - name: Create user.ldif
+      ansible.builtin.copy:
+        dest: "{{ user_file }}"
+        content: |
+          dn: uid=nciuser1,ou=People,dc=ncitraininf,dc=local
+          objectClass: inetOrgPerson
+          objectClass: posixAccount
+          objectClass: shadowAccount
+          cn: NCI User1
+          sn: User
+          uid: nciuser1
+          uidNumber: 10000
+          gidNumber: 10000
+          homeDirectory: /home/nciuser1
+          loginShell: /bin/bash
+          userPassword: {{ ldap_root_hash.stdout }}
+        owner: root
+        group: root
+        mode: '0644'
+      tags:
+        - users
+
+    - name: Add test user
+      ansible.builtin.command:
+        cmd: "ldapadd -x -D '{{ ldap_admin_dn }}' -w {{ ldap_root_password }} -f {{ user_file }}"
+      ignore_errors: yes
+      tags:
+        - users
+
+    - name: Verify LDAP entries
+      ansible.builtin.command:
+        cmd: "ldapsearch -x -b dc=ncitraininf,dc=local"
+      register: ldap_entries
+      ignore_errors: yes
+      tags:
+        - verify
+
+    - name: Show LDAP entries
+      ansible.builtin.debug:
+        var: ldap_entries.stdout_lines
+      tags:
+        - verify

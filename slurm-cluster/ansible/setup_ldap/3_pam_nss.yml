@@ -1,0 +1,51 @@
+- name: Configure PAM and NSS for LDAP authentication on clients
+  hosts: login,compute
+  become: yes
+
+  tasks:
+    - name: Install required PAM and NSS packages
+      apt:
+        name:
+          - libpam-ldapd
+          - libnss-ldapd
+          - nslcd
+          - nscd
+        state: present
+        update_cache: yes
+
+    - name: Configure NSS to use ldap (passwd, group, shadow)
+      lineinfile:
+        path: /etc/nsswitch.conf
+        regexp: "^({{ item }}:).*"
+        line: "{{ item }}: files ldap"
+      loop:
+        - passwd
+        - group
+        - shadow
+
+    - name: Configure PAM to use LDAP for authentication
+      pamd:
+        name: common-auth
+        type: auth
+        control: sufficient
+        module_path: pam_ldap.so
+        state: updated
+
+    - name: Configure PAM to create home directories on login (optional)
+      pamd:
+        name: common-session
+        type: session
+        control: required
+        module_path: pam_mkhomedir.so
+        module_arguments: "skel=/etc/skel umask=0077"
+        state: updated
+
+    - name: Restart services
+      service:
+        name: nslcd
+        state: restarted
+
+    - name: Restart nscd service
+      service:
+        name: nscd
+        state: restarted

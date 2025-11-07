@@ -1,0 +1,77 @@
+---
+- name: Initial setup to build and install amazon-efs-utils on EC2 nodes
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Install system dependencies for building amazon-efs-utils
+      apt:
+        name:
+          - git
+          - binutils
+          - curl
+          - pkg-config
+          - libssl-dev
+          - cmake
+        state: present
+        update_cache: yes
+
+    - name: Install Rust (cargo) for building amazon-efs-utils
+      shell: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      args:
+        creates: "{{ ansible_env.HOME }}/.cargo/bin/cargo"
+      environment:
+        CARGO_HOME: "{{ ansible_env.HOME }}/.cargo"
+
+    - name: Set PATH to include cargo
+      set_fact:
+        path_with_cargo: "{{ ansible_env.HOME }}/.cargo/bin:{{ ansible_env.PATH }}"
+
+    - name: Clone amazon-efs-utils repository
+      git:
+        repo: https://github.com/aws/efs-utils.git
+        dest: /tmp/efs-utils
+        version: master
+        force: yes
+
+    - name: Build amazon-efs-utils deb package
+      shell: |
+        export PATH="{{ path_with_cargo }}"
+        ./build-deb.sh
+      args:
+        chdir: /tmp/efs-utils
+      register: build_output
+      ignore_errors: yes
+
+    - name: Debug build output
+      debug:
+        var: build_output.stdout_lines
+
+    - name: List files in /tmp/efs-utils/build
+      command: ls -l /tmp/efs-utils/build/
+      register: ls_build_dir
+
+    - name: Debug the list of built files
+      debug:
+        var: ls_build_dir.stdout_lines
+
+    - name: Find amazon-efs-utils deb file
+      find:
+        paths: /tmp/efs-utils/build/
+        patterns: "amazon-efs-utils*.deb"
+        file_type: file
+      register: deb_files
+
+    - name: Fail if deb package not found
+      fail:
+        msg: "amazon-efs-utils.deb was not built correctly. See build output for errors."
+      when: deb_files.matched == 0
+
+    - name: Set deb file path fact
+      set_fact:
+        deb_file_path: "{{ deb_files.files[0].path }}"
+
+    - name: Install amazon-efs-utils deb package
+      apt:
+        deb: "{{ deb_file_path }}"

@@ -1,0 +1,27 @@
+---
+- name: Update and install basic tools on all nodes
+  hosts: all
+  become: yes
+  tags:
+    - update
+    - install_tools
+  tasks:
+    - name: Update all packages
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+      tags:
+        - update
+
+    - name: Install vim, wget, and net-tools
+      ansible.builtin.dnf:
+        name:
+          - vim
+          - wget
+          - net-tools
+        state: present
+      tags:
+        - install_tools
+
+
+

@@ -13,4 +13,4 @@ Contents
    initial_setup.rst
    terraform.rst
    ansible.rst
-   slurm_cluster.rst
+   pbs_cluster.rst

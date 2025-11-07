@@ -1,0 +1,19 @@
+- name: Give ubuntu user full privileges on /apps on control node
+  hosts: control
+  become: yes
+
+  tasks:
+    - name: Change ownership of /apps to ubuntu recursively
+      file:
+        path: /apps
+        owner: ubuntu
+        group: ubuntu
+        recurse: yes
+        state: directory
+
+    - name: Set permissions on /apps to 775 recursively
+      file:
+        path: /apps
+        mode: "u=rwx,g=rwx,o=rx"
+        recurse: yes
+        state: directory

@@ -27,14 +27,6 @@ resource "aws_efs_file_system" "home" {
   }
 }
 
-# Mount targets for all EFS in all subnets
-//resource "aws_efs_mount_target" "efs_mount" {
-//  count = length(local.efs_filesystems) * length(local.subnet_ids)
-//
-//  file_system_id  = element(values(local.efs_filesystems), count.index % length(local.efs_filesystems))
-//  subnet_id       = local.subnet_ids[floor(count.index / length(local.efs_filesystems))]
-//  security_groups = [aws_security_group.efs_sg.id]
-//}
 
 resource "aws_efs_mount_target" "apps_mount" {
   file_system_id  = aws_efs_file_system.apps.id
