@@ -1,8 +1,8 @@
 
-Slurm Cluster
+PBS Cluster
 ============================
 
-The design for the slurm cluster is as follows:
+The design for the pbs cluster is as follows:
 
 1. One control or head node (node1)
 2. One login node (node2)
@@ -16,12 +16,17 @@ Make sure the following packages are installed on all nodes:
 
 .. code-block:: bash
 
+    
+    sudo dnf update -y
+    sudo dnf clean all 
+    sudo dnf makecache
+    sudo dnf repolist
     sudo dnf install -y wget vim gcc gcc-c++ make
     sudo dnf install -y "kernel-devel-{{ ansible_kernel }}" 
     sudo dnf install -y "kernel-headers-{{ ansible_kernel }}"
 
-    sudo wget -O https://www.beegfs.io/release/beegfs_8.2/dists/beegfs-rhel10.repo  \ 
-            https://www.beegfs.io/release/beegfs_8.2/dists/beegfs-rhel10.repo
+    sudo wget -O https://www.beegfs.io/release/beegfs_8.2/dists/beegfs-rhel9.repo  \ 
+            https://www.beegfs.io/release/beegfs_8.2/dists/beegfs-rhel9.repo
 
 Passwordless SSH
 ----------------------------
@@ -39,7 +44,29 @@ For this setup, we are using:
 
 * BeeGFS version: 8.2.x
 
-* Operating System: RHEL 10
+* Operating System: Rocky Linux 9
+
+
+In some case the kernel-devel and kernel-headers versions may not match the running kernel version.
+To check the versions, run the following commands on the node:
+
+.. code-block:: bash
+
+    uname -r
+    rpm -q kernel-headers kernel-devel
+
+If they do not match, you may need to reboot the node after installing the correct versions.
+To be safe do this on all nodes after installing the kernel-devel and kernel-headers packages.
+
+.. code-block:: bash
+
+    sudo dnf update -y
+    sudo dnf clean all
+    sudo dnf makecache
+    sudo dnf repolist
+    sudo reboot
+
+
 
 Disk and Directory setup
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -443,299 +470,6 @@ client nodes.
     ls /scratch/
 
 
-OpenLDAP Server and SSSD Client Integration
-----------------------------
-
-
-The OpenLDAP server is on a control node and and LDAP clients are on login and compute nodes.
-
-OpenLDAP Server (Control Node)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Install LDAP packages:
-
-.. code-block:: bash
-
-    sudo dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(rpm -E %rhel).noarch.rpm -y
-    sudo dnf install epel-release -y
-    sudo dnf install openldap-servers openldap-clients -y
-    sudo dnf install vim -y
-
-
-Enable and start LDAP service: 
-
-.. code-block:: bash
-
-    sudo systemctl enable --now slapd
-    sudo systemctl status slapd
-
-
-Load standard schemas:
-
-
-.. code-block:: bash
-
-    sudo ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/core.ldif
-    sudo ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/cosine.ldif
-    sudo ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/inetorgperson.ldif
-    sudo ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/nis.ldif
-
-
-Generate admin password hash:
-
-.. code-block:: bash
-
-    slappasswd
-
-
-Copy the hash for the next step (example: `{SSHA}bS9h9bbVyVyccwYhO9Xt2Jz9JepWZc5E`).
-
-Configure database suffix, root DN, and password:
-
-Create `/root/db_config.ldif`:
-
-.. code-block:: bash
-
-
-    dn: olcDatabase={2}mdb,cn=config
-    changetype: modify
-    replace: olcSuffix
-    olcSuffix: dc=ncitraininf,dc=local
-    -
-    replace: olcRootDN
-    olcRootDN: cn=admin,dc=ncitraininf,dc=local
-    -
-    replace: olcRootPW
-    olcRootPW: {SSHA}bS9h9bbVyVyccwYhO9Xt2Jz9JepWZc5E
-
-
-Apply:
-
-.. code-block:: bash
-
-    sudo ldapmodify -Y EXTERNAL -H ldapi:/// -f /root/db_config.ldif
-
-
-Create base domain `/root/domain.ldif`:
-
-.. code-block:: bash
-
-    dn: dc=ncitraininf,dc=local
-    objectClass: top
-    objectClass: dcObject
-    objectClass: organization
-    o: NCI Training
-    dc: ncitraininf
-
-
-Add:
-
-
-.. code-block:: bash
-
-    ldapadd -x -D "cn=admin,dc=ncitraininf,dc=local" -W -f /root/domain.ldif
-
-
-Create organizational units `/root/base.ldif`:
-
-.. code-block:: bash
-
-    dn: ou=People,dc=ncitraininf,dc=local
-    objectClass: organizationalUnit
-    ou: People
-
-    dn: ou=Groups,dc=ncitraininf,dc=local
-    objectClass: organizationalUnit
-    ou: Groups
-
-
-
-Add:
-
-.. code-block:: bash
-
-    ldapadd -x -D "cn=admin,dc=ncitraininf,dc=local" -W -f /root/base.ldif
-
-
-and `/root/people.ldif`:
-
-.. code-block:: bash
-
-    dn: ou=People,dc=ncitraininf,dc=local
-    objectClass: organizationalUnit
-    ou: People
-
-
-Add:
-
-.. code-block:: bash
-
-    sudo ldapadd -x -D "cn=admin,dc=ncitraininf,dc=local" -W -f /root/people.ldif
-
-
-Add a test group `/root/group.ldif`:
-
-.. code-block:: bash
-
-    dn: cn=training,ou=Groups,dc=ncitraininf,dc=local
-    objectClass: posixGroup
-    cn: training
-    gidNumber: 10000
-
-
-Add:
-
-.. code-block:: bash
-
-    ldapadd -x -D "cn=admin,dc=ncitraininf,dc=local" -W -f /root/group.ldif
-
-
-Add a test user `/root/user.ldif`:
-
-.. code-block:: bash
-
-    dn: uid=john,ou=People,dc=ncitraininf,dc=local
-    objectClass: inetOrgPerson
-    objectClass: posixAccount
-    objectClass: shadowAccount
-    cn: John
-    sn: Doe
-    uid: john
-    uidNumber: 10000
-    gidNumber: 10000
-    homeDirectory: /home/john
-    loginShell: /bin/bash
-    userPassword: {SSHA}<hash-from-slappasswd>
-
-
-Add:
-
-.. code-block:: bash
-
-    ldapadd -x -D "cn=admin,dc=ncitraininf,dc=local" -W -f /root/user.ldif
-
-
-Verify entries
-
-.. code-block:: bash
-
-    ldapsearch -x -b dc=ncitraininf,dc=local
-
-
-
-
-LDAP Clients (Login / Compute Nodes)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Install SSSD and tools
-
-.. code-block:: bash
-
-    sudo dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(rpm -E %rhel).noarch.rpm
-    sudo dnf install epel-release -y
-    sudo dnf install sssd sssd-ldap sssd-tools oddjob-mkhomedir -y
-
-
-Create `/etc/sssd/sssd.conf`
-
-.. code-block:: bash
-
-    [sssd]
-    services = nss, pam
-    domains = ldap
-
-    [domain/ldap]
-    id_provider = ldap
-    auth_provider = ldap
-    ldap_uri = ldap://10.0.1.170
-    ldap_search_base = dc=ncitraininf,dc=local
-    ldap_default_bind_dn = cn=admin,dc=ncitraininf,dc=local
-    ldap_default_authtok_type = password
-    ldap_default_authtok = ldappassword
-    cache_credentials = True
-    enumerate = True
-    fallback_homedir = /home/%u
-    ldap_tls_reqcert = never
-    ldap_id_use_start_tls = False
-    debug_level = 9
-
-    ldap_schema = rfc2307
-    ldap_user_object_class = inetOrgPerson
-    ldap_group_object_class = posixGroup
-    ldap_user_search_base = dc=ncitraininf,dc=local
-    ldap_group_search_base = dc=ncitraininf,dc=local
-    ldap_user_search_filter = (objectClass=inetOrgPerson)
-    ldap_group_search_filter = (objectClass=posixGroup)
-
-Set permissions:
-
-.. code-block:: bash
-
-    sudo chmod 600 /etc/sssd/sssd.conf
-    sudo chown root:root /etc/sssd/sssd.conf
-
-
-Configure Name Service Switch:
-
-Edit `/etc/nsswitch.conf`:
-
-.. code-block:: bash
-
-    # Generated by authselect
-    # Do not modify this file manually, use authselect instead. Any user changes will be overwritten.
-    # You can stop authselect from managing your configuration by calling 'authselect opt-out'.
-    # See authselect(8) for more details.
-
-    # In order of likelihood of use to accelerate lookup.
-
-    passwd:     files sss
-    shadow:     files sss
-    group:      files sss
-    hosts:      files dns myhostname
-    services:   files
-    netgroup:   files
-    automount:  files
-
-    aliases:    files
-    ethers:     files
-    gshadow:    files
-    networks:   files dns
-    protocols:  files
-    publickey:  files
-    rpc:        files
-
-
-Enable automatic home directories
-
-.. code-block:: bash
-
-    sudo authselect enable-feature with-mkhomedir
-    sudo authselect apply-changes
-
-
-Clear old SSSD cache:
-
-.. code-block:: bash
-
-    sudo systemctl stop sssd
-    sudo sss_cache -E
-
-
-Enable and start SSSD
-
-.. code-block:: bash
-
-    sudo systemctl enable --now sssd
-    sudo systemctl status sssd
-
-
-Test LDAP connectivity and user lookup
-
-.. code-block:: bash
-
-    getent passwd john
-    ldapsearch -x -H ldap://<LDAP_SERVER_IP> -D "cn=admin,dc=ncitraininf,dc=local" -W -b dc=ncitraininf,dc=local
-
 
 
 PBS Installation and Configuration
@@ -883,6 +617,17 @@ Verify PBS is reachable from the login node:
 .. code-block:: bash
     
     sudo /opt/pbs/bin/qstat -B
+
+
+OpeNLDAP Integration
+----------------------------
+
+
+.. code-block:: 
+    
+
+
+
 
 
 
