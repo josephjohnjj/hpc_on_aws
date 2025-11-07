@@ -29,17 +29,7 @@
         executable: /bin/bash
       tags: repo
 
-    #- name: Enable AppStream repository
-    #  ansible.builtin.shell: dnf config-manager --set-enabled AppStream
-    #  args:
-    #    executable: /bin/bash
-    #  tags: repo
 
-    #- name: Enable BaseOS repository
-    #  ansible.builtin.shell: dnf config-manager --set-enabled BaseOS
-    #  args:
-    #    executable: /bin/bash
-    #  tags: repo
 
 
     - name: Install EPEL repository

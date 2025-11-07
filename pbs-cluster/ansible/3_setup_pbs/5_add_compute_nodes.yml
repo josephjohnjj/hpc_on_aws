@@ -13,8 +13,6 @@
     - name: Create PBS compute nodes
       ansible.builtin.command: "{{ pbs_exec }}/bin/qmgr -c 'create node {{ item }}'"
       loop: "{{ compute_nodes }}"
-      args:
-        warn: false
       register: create_nodes
       ignore_errors: yes
       tags: create_nodes

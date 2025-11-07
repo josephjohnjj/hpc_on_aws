@@ -5,6 +5,28 @@
   hosts: control, compute, login
   become: yes
   tasks:
+
+    - name: Ensure PBS spool directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - /var/spool/pbs
+        - /var/spool/pbs/spool
+        - /var/spool/pbs/server_priv
+        - /var/spool/pbs/server_priv/security
+
+    - name: Ensure /var/spool/pbs/server_name file exists
+      ansible.builtin.file:
+        path: /var/spool/pbs/server_name
+        state: touch
+        owner: root
+        group: root
+        mode: '0644'
+
     - name: Write PBS server name to /var/spool/pbs/server_name
       ansible.builtin.shell: echo "node1" > /var/spool/pbs/server_name
       args:
