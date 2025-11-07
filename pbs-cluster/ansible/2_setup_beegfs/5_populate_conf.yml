@@ -1,3 +1,5 @@
+---
+
 - name: Configure BeeGFS management daemon TLS and auth
   hosts: control
   become: true
@@ -12,6 +14,11 @@
         regexp: '^tls-cert-file\s*='
         line: 'tls-cert-file = "/etc/beegfs/cert.pem"'
         create: yes
+      tags:
+        - mgmtd
+        - tls
+        - security
+        - beegfs
 
     - name: Ensure TLS key path in beegfs-mgmtd.toml
       lineinfile:
@@ -19,6 +26,11 @@
         regexp: '^tls-key-file\s*='
         line: 'tls-key-file = "/etc/beegfs/key.pem"'
         create: yes
+      tags:
+        - mgmtd
+        - tls
+        - security
+        - beegfs
 
     - name: Ensure auth file path in beegfs-mgmtd.toml
       lineinfile:
@@ -26,7 +38,11 @@
         regexp: '^auth-file\s*='
         line: 'auth-file = "/etc/beegfs/conn.auth"'
         create: yes
-
+      tags:
+        - mgmtd
+        - auth
+        - security
+        - beegfs
 
 
 - name: Configure BeeGFS metadata daemon on storage nodes
@@ -43,6 +59,11 @@
         regexp: '^connAuthFile\s*='
         line: 'connAuthFile = /etc/beegfs/conn.auth'
         create: yes
+      tags:
+        - meta
+        - auth
+        - beegfs
+        - storage
 
     - name: Set sysMgmtdHost in beegfs-meta.conf
       lineinfile:
@@ -50,6 +71,11 @@
         regexp: '^sysMgmtdHost\s*='
         line: 'sysMgmtdHost = node1'
         create: yes
+      tags:
+        - meta
+        - mgmtd
+        - beegfs
+        - storage
 
 
 - name: Configure BeeGFS storage daemon on storage nodes
@@ -66,6 +92,10 @@
         regexp: '^storeStorageDirectory\s*='
         line: 'storeStorageDirectory = /storage/stor1,/storage/stor2'
         create: yes
+      tags:
+        - storage_daemon
+        - beegfs
+        - storage
 
     - name: Set sysMgmtdHost in beegfs-storage.conf
       lineinfile:
@@ -73,6 +103,11 @@
         regexp: '^sysMgmtdHost\s*='
         line: 'sysMgmtdHost = node1'
         create: yes
+      tags:
+        - storage_daemon
+        - mgmtd
+        - beegfs
+        - storage
 
     - name: Set connAuthFile in beegfs-storage.conf
       lineinfile:
@@ -80,6 +115,11 @@
         regexp: '^connAuthFile\s*='
         line: 'connAuthFile = /etc/beegfs/conn.auth'
         create: yes
+      tags:
+        - storage_daemon
+        - auth
+        - beegfs
+        - storage
 
 
 - name: Configure BeeGFS client
@@ -98,6 +138,9 @@
         owner: root
         group: root
         mode: "0755"
+      tags:
+        - client_config
+        - beegfs
 
     - name: Set sysMgmtdHost in beegfs-client.conf
       lineinfile:
@@ -105,7 +148,10 @@
         regexp: '^sysMgmtdHost\s*='
         line: 'sysMgmtdHost = node1'
         create: yes
-
+      tags:
+        - client_config
+        - mgmtd
+        - beegfs
 
     - name: Set connAuthFile in beegfs-client.conf
       lineinfile:
@@ -113,6 +159,10 @@
         regexp: '^connAuthFile\s*='
         line: 'connAuthFile = /etc/beegfs/conn.auth'
         create: yes
+      tags:
+        - client_config
+        - auth
+        - beegfs
 
     - name: Update /etc/beegfs/beegfs-mounts.conf to mount /scratch
       lineinfile:
@@ -120,3 +170,7 @@
         regexp: '^.*$'
         line: '/scratch /etc/beegfs/beegfs-client.conf'
         create: yes
+      tags:
+        - client_config
+        - mounts
+        - beegfs

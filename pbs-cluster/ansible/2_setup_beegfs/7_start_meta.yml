@@ -24,10 +24,17 @@
       register: meta_setup
       failed_when: meta_setup.rc != 0
       changed_when: true
+      tags:
+        - storage
+        - setup
 
     - name: Display beegfs-setup-meta output
       debug:
         msg: "{{ inventory_hostname }} output: {{ meta_setup.stdout }}"
+      tags:
+        - storage
+        - setup
+        - debug
 
 
 - name: Start BeeGFS metadata service on storage nodes
@@ -42,6 +49,9 @@
         name: beegfs-meta
         state: started
         enabled: yes
+      tags:
+        - storage
+        - start
 
 
 - name: List BeeGFS metadata nodes
@@ -55,12 +65,14 @@
       command: /opt/beegfs/sbin/beegfs node list --mgmtd-addr node1:8010 --node-type meta
       register: meta_nodes
       ignore_errors: yes
+      tags:
+        - management
+        - status
 
     - name: Display metadata nodes
       debug:
         msg: "{{ meta_nodes.stdout }}"
-
-
-
-
-
+      tags:
+        - management
+        - status
+        - debug

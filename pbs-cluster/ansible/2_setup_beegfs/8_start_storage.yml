@@ -39,6 +39,10 @@
       register: storage_setup
       failed_when: storage_setup.rc != 0
       changed_when: true
+      tags:
+        - storage
+        - setup
+
 
 
 - name: Start and verify BeeGFS storage service on storage nodes
@@ -53,6 +57,9 @@
         name: beegfs-storage
         state: started
         enabled: yes
+      tags:
+        - storage
+        - start
 
 
 - name: List BeeGFS storage nodes
@@ -66,9 +73,14 @@
       command: /opt/beegfs/sbin/beegfs node list --mgmtd-addr node1:8010 --node-type storage
       register: storage_nodes
       ignore_errors: yes
+      tags:
+        - management
+        - status
 
     - name: Display storage nodes
       debug:
         msg: "{{ storage_nodes.stdout }}"
-
-
+      tags:
+        - management
+        - status
+        - debug

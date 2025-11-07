@@ -1,26 +1,90 @@
 ---
+
+- name: Ensure latest kernel and headers are installed and in use
+  hosts: all
+  become: yes
+  tasks:
+
+  - name: Install latest kernel and headers
+    ansible.builtin.dnf:
+      name:
+        - kernel
+        - kernel-devel
+        - kernel-headers
+      state: latest
+
+  - name: Reboot nodes to apply new kernel
+    ansible.builtin.reboot:
+      reboot_timeout: 600
+      msg: "Rebooting to apply latest kernel and header versions"
+
+  - name: Verify running kernel after reboot
+    ansible.builtin.command: uname -r
+    register: kernel_version
+
+  - name: Display running kernel version
+    ansible.builtin.debug:
+      msg: "Node {{ inventory_hostname }} running kernel {{ kernel_version.stdout }}"
+
+  
+
+  
 - name: Setup Red Hat node for BeeGFS
   hosts: all
   become: yes
   gather_facts: yes
 
   tasks:
+
+    - name: Update all packages
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+      tags: update
+
+    - name: Clean all DNF caches
+      ansible.builtin.shell: dnf clean all
+      args:
+        executable: /bin/bash
+      tags: update
+
+    - name: Rebuild DNF cache
+      ansible.builtin.shell: dnf makecache
+      args:
+        executable: /bin/bash
+      tags: update
+
+    
+    - name: List enabled DNF repositories
+      command: dnf repolist
+      tags: update
+
+    - name: Reboot nodes
+      reboot:
+        reboot_timeout: 600
+        test_command: whoami
+
     - name: Install required packages
       dnf:
         name:
           - wget
           - vim
-          - gcc
-          - make
+          - "@Development Tools"  # Installs gcc, make, etc.
           - "kernel-devel-{{ ansible_kernel }}"
           - "kernel-headers-{{ ansible_kernel }}"
         state: present
+      tags:
+        - packages
+        - beegfs
 
-    - name: Download BeeGFS RHEL 10 repo (v8.2)
+    - name: Download BeeGFS RHEL 9 repo (v8.2)
       get_url:
-        url: "https://www.beegfs.io/release/beegfs_8.2/dists/beegfs-rhel10.repo"
-        dest: /etc/yum.repos.d/beegfs-rhel10.repo
+        url: "https://www.beegfs.io/release/beegfs_8.2/dists/beegfs-rhel9.repo"
+        dest: /etc/yum.repos.d/beegfs-rhel9.repo
         mode: "0644"
+      tags:
+        - repo
+        - beegfs
 
     - name: Ensure /opt/beegfs/sbin is in PATH for all users
       lineinfile:
@@ -29,9 +93,14 @@
         line: "export PATH=$PATH:/opt/beegfs/sbin"
         state: present
         mode: "0755"
+      tags:
+        - path
+        - beegfs
 
     - name: Reload profile to update PATH
       shell: source /etc/profile.d/beegfs.sh
       args:
         executable: /bin/bash
-      # This only affects the current shell in Ansible; future logins will have the PATH set.
+      tags:
+        - path
+        - beegfs

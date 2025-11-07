@@ -1,5 +1,5 @@
 ---
-- name: Start BeeGFS client service on compute and login nodes
+- name: Ensure BeeGFS client dependencies and start service on compute and login nodes
   hosts:
     - compute
     - login
@@ -8,11 +8,46 @@
     - client
     - start
   tasks:
+
+    - name: Install required build tools and matching kernel headers
+      dnf:
+        name:
+          - gcc
+          - make
+          - perl
+          - kernel-devel-{{ ansible_kernel }}
+          - kernel-headers-{{ ansible_kernel }}
+        state: present
+
+    - name: Reboot node if kernel was updated
+      reboot:
+        reboot_timeout: 600
+        test_command: whoami
+      when: ansible_kernel != ansible_facts['kernel']
+
     - name: Start beegfs-client service
       systemd:
         name: beegfs-client
         state: started
         enabled: yes
+      tags:
+        - client
+        - start
+
+    - name: Verify BeeGFS module is loaded
+      command: lsmod | grep beegfs
+      register: beegfs_module
+      ignore_errors: yes
+      tags:
+        - client
+        - debug
+
+    - name: Show BeeGFS module status
+      debug:
+        msg: "{{ beegfs_module.stdout_lines }}"
+      tags:
+        - client
+        - debug
 
 
 - name: List connected BeeGFS client nodes from controller
@@ -26,10 +61,14 @@
       command: /opt/beegfs/sbin/beegfs node list --mgmtd-addr node1:8010 --node-type client
       register: client_nodes
       ignore_errors: yes
+      tags:
+        - client
+        - list
 
     - name: Display connected BeeGFS client nodes
       debug:
         msg: "{{ client_nodes.stdout }}"
-
-
-    
+      tags:
+        - client
+        - list
+        - debug
