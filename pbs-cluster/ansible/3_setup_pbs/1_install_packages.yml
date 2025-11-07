@@ -1,0 +1,104 @@
+---
+- name: Install OpenPBS dependencies on all nodes
+  hosts: all
+  become: yes
+  tasks:
+
+    - name: Update all packages
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+      tags: update
+
+    - name: Clean all DNF caches
+      ansible.builtin.shell: dnf clean all
+      args:
+        executable: /bin/bash
+      tags: dnf
+
+    - name: Rebuild DNF cache
+      ansible.builtin.shell: dnf makecache
+      args:
+        executable: /bin/bash
+      tags: dnf
+
+
+    - name: Enable CRB repository
+      ansible.builtin.shell: dnf config-manager --set-enabled crb
+      args:
+        executable: /bin/bash
+      tags: repo
+
+    #- name: Enable AppStream repository
+    #  ansible.builtin.shell: dnf config-manager --set-enabled AppStream
+    #  args:
+    #    executable: /bin/bash
+    #  tags: repo
+
+    #- name: Enable BaseOS repository
+    #  ansible.builtin.shell: dnf config-manager --set-enabled BaseOS
+    #  args:
+    #    executable: /bin/bash
+    #  tags: repo
+
+
+    - name: Install EPEL repository
+      ansible.builtin.dnf:
+        name: epel-release
+        state: present
+      tags: epel
+
+    - name: Install Development Tools group
+      ansible.builtin.dnf:
+        name: "@Development Tools"
+        state: present
+      tags: devtools
+
+    - name: Install required packages
+      ansible.builtin.dnf:
+        name:
+          - libedit-devel
+          - libical-devel
+          - ncurses-devel
+          - make
+          - cmake
+          - gcc
+          - gcc-c++
+          - libX11-devel
+          - libXt-devel
+          - libXext-devel
+          - libXmu-devel
+          - tcl-devel
+          - tk-devel
+          - postgresql-devel
+          - postgresql-server
+          - postgresql-contrib
+          - python3
+          - python3-devel
+          - perl
+          - expat-devel
+          - hwloc-devel
+          - java-21-openjdk-devel
+          - cjson-devel
+          - swig
+          - swig-doc
+          - vim
+        state: present
+        update_cache: yes
+      tags: packages
+
+    - name: Create PBS environment file
+      ansible.builtin.copy:
+        dest: /etc/profile.d/pbs.sh
+        content: |
+          export PATH=/opt/pbs/bin:/opt/pbs/sbin:$PATH
+        owner: root
+        group: root
+        mode: '0644'
+      tags: pbs_env
+
+    - name: Source PBS environment for current session
+      ansible.builtin.shell: source /etc/profile.d/pbs.sh
+      args:
+        executable: /bin/bash
+      tags: pbs_env

@@ -1,0 +1,11 @@
+---
+# master_setup.yml
+- import_playbook: 1_inital_installation.yml
+- import_playbook: 2_mount_directories.yml
+- import_playbook: 3_install_beegfs_servers.yml
+- import_playbook: 4_create_security_files.yml
+- import_playbook: 5_populate_conf.yml
+- import_playbook: 6_start_manager.yml
+- import_playbook: 7_start_meta.yml
+- import_playbook: 8_start_storage.yml
+- import_playbook: 9_start_client.yml
