@@ -478,43 +478,73 @@ PBS Installation and Configuration
 The PBS server is installed on the control node, while the PBS clients are installed on the
 login and compute nodes.
 
+First, disable SELinux on all nodes. OpenPBS does not work well with SELinux enabled.
+
+.. code-block:: bash
+
+    sudo setenforce 0
+
+
+
 
 Install the following on all nodes:
 
 .. code-block:: bash
 
-    sudo dnf update -y
+    
     sudo dnf config-manager --set-enabled crb
-    sudo dnf install -y epel-release
-    sudo dnf groupinstall -y "Development Tools"
-    sudo dnf install -y libedit-devel libical-devel ncurses-devel 
-    sudo dnf install make cmake gcc gcc-c++
-    sudo dnf install -y libX11-devel libXt-devel libXext-devel libXmu-devel
-    sudo dnf install -y tcl-devel tk-devel
-    sudo dnf install -y postgresql-devel postgresql-server postgresql-contrib 
-    sudo dnf install -y python3 python3-devel perl
-    sudo dnf install -y expat-devel
-    sudo dnf install -y libedit-devel
-    sudo dnf install -y hwloc-devel
-    sudo dnf install -y libical-devel
-    sudo dnf install java-21-openjdk-devel
-    sudo dnf install -y cjson-devel
-    sudo dnf install -y swig swig-doc
-    sudo dnf install -y vim
+    sudo dnf update -y
+    sudo dnf install -y epel-release 
+    sudo dnf install -y  cjson-devel \
+        libedit-devel libical-devel ncurses-devel \
+        make cmake rpm-build libtool gcc gcc-c++ \
+        libX11-devel libXt-devel libXext libXext-devel libXmu-devel \
+        tcl-devel tk-devel \
+        postgresql-devel postgresql-server postgresql-contrib \
+        python3 python3-devel perl expat-devel openssl-devel \
+        hwloc-devel java-21-openjdk-devel  \
+        swig swig-doc vim sendmail chkconfig autoconf automake git 
+
+
 
 
 Then build OpenPBS from source all nodes:
 
 .. code-block:: bash
 
-    sudo git clone https://github.com/openpbs/openpbs.git
-    cd openpbs
+    sudo git clone https://github.com/openpbs/openpbs.git && cd openpbs
     sudo ./autogen.sh
     sudo ./configure --prefix=/opt/pbs
-    sudo make -j$(nproc)
-    sudo make install
+    sudo make -j$(nproc) && sudo make install
     echo "export PATH=/opt/pbs/bin:/opt/pbs/sbin:\$PATH" | sudo tee /etc/profile.d/pbs.sh
     source /etc/profile.d/pbs.sh
+
+
+
+
+
+run this on all nodes:
+
+.. code-block:: bash
+
+    sudo /opt/pbs/libexec/pbs_postinstall
+
+.. code-block:: bash
+
+    sudo chmod 4755 /opt/pbs/sbin/pbs_iff /opt/pbs/sbin/pbs_rcp
+
+
+If it doesnt alreadt exist - create the required directories and set permissions on the head node:
+
+.. code-block:: bash
+
+    sudo mkdir -p /var/spool/pbs/server_priv/security
+    sudo chown root:root /var/spool/pbs/server_priv/security
+    sudo chmod 700 /var/spool/pbs/server_priv/security
+
+.. code-block:: bash
+
+    sudo sh -c 'echo "node1" > /var/spool/pbs/server_name'
 
 
 Once installed, configure PBS by editing the configuration file. Edit the file `sudo vim /etc/pbs.conf`
@@ -532,19 +562,6 @@ On the head node, set the following parameters:
     PBS_CORE_LIMIT=unlimited
     PBS_SCP=/bin/scp
 
-
-on the compute nodes, set:
-
-.. code-block:: bash
-
-    PBS_SERVER=node1
-    PBS_START_SERVER=0
-    PBS_START_SCHED=0
-    PBS_START_COMM=0
-    PBS_START_MOM=1
-    PBS_HOME=/var/spool/pbs
-    PBS_EXEC=/opt/pbs
-
 on the login node, set:
 
 .. code-block:: bash
@@ -558,36 +575,20 @@ on the login node, set:
     PBS_EXEC=/opt/pbs
 
 
-Create the required directories and set permissions on the head node:
+on the compute nodes, set:
 
 .. code-block:: bash
 
-    sudo mkdir -p /var/spool/pbs/server_priv/security
-    sudo chown root:root /var/spool/pbs/server_priv/security
-    sudo chmod 700 /var/spool/pbs/server_priv/security
-
-run this on all nodes **This is very important**:
-
-.. code-block:: bash
-
-    sudo chmod 4755 /opt/pbs/sbin/pbs_iff /opt/pbs/sbin/pbs_rcp
-
-
-On all nodes
-
-.. code-block:: bash
-
-    sudo sh -c 'echo "node1" > /var/spool/pbs/server_name'
-
-On the head node, initialize the PBS server:
-
-.. code-block:: bash
-
-    sudo /opt/pbs/libexec/pbs_postinstall
+    PBS_SERVER=node1
+    PBS_START_SERVER=0
+    PBS_START_SCHED=0
+    PBS_START_COMM=0
+    PBS_START_MOM=1
+    PBS_HOME=/var/spool/pbs
+    PBS_EXEC=/opt/pbs
 
 
 
-Then enable and start PBS services on all nodes:
 
 .. code-block:: bash
 
@@ -609,7 +610,7 @@ Then verify the nodes are added:
 .. code-block:: bash
 
 
-    sudo /opt/pbs/bin/qmgr -c "list server"
+    sudo /opt/pbs/bin/qmgr -c "list node @active"
 
 
 Verify PBS is reachable from the login node:
@@ -961,6 +962,7 @@ Try to login to the client node using the LDAP user:
 
     su - testuser1
 
+
 Sometimes SELinux can interfere with LDAP authentication.  Especialy the home directory
 creation. If you encounter issues,you may need to temporarily set SELinux to permissive mode 
 for testing purposes:
@@ -968,7 +970,6 @@ for testing purposes:
 .. code-block:: bash
 
     sudo setenforce 0
-
 
 On AWS, to allow password authentication over SSH, you may need to modify the SSHD 
 configuration in the file `/etc/ssh/sshd_config.d/50-cloud-init.conf`:
