@@ -1,0 +1,39 @@
+---
+- name: Copy LDIF files to control node
+  hosts: control
+  become: true
+  vars:
+    ldif_files:
+      - addou.ldif
+      - changerootpass.ldif
+      - setdomain.ldif
+      - tls.ldif
+      - user1.ldif
+    ldif_src_dir: "{{ playbook_dir }}/../ldap_files"
+    ldif_dest_dir: /etc/openldap/ldif
+  tasks:
+
+    - name: Ensure LDIF destination directory exists
+      file:
+        path: "{{ ldif_dest_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      tags:
+        - ldap
+        - setup
+        - create_ldif_dir
+
+    - name: Copy each LDIF file to control node
+      copy:
+        src: "{{ ldif_src_dir }}/{{ item }}"
+        dest: "{{ ldif_dest_dir }}/{{ item }}"
+        owner: root
+        group: root
+        mode: "0644"
+      loop: "{{ ldif_files }}"
+      tags:
+        - ldap
+        - copy
+        - ldif_files

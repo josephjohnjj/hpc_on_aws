@@ -17,6 +17,10 @@
         recurse: yes
       delegate_to: localhost
       become: false
+      tags:
+        - keys
+        - setup
+        - control_node
 
     - name: Ensure .ssh directory exists
       file:
@@ -25,6 +29,9 @@
         mode: "0700"
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
+      tags:
+        - ssh
+        - setup
 
     - name: Generate SSH key pair (if not present)
       openssh_keypair:
@@ -34,11 +41,19 @@
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
         mode: "0600"
+      tags:
+        - ssh
+        - keys
+        - generate
 
     - name: Read public key
       slurp:
         src: "{{ ssh_key_path }}.pub"
       register: pubkey
+      tags:
+        - ssh
+        - keys
+        - read
 
     - name: Save public key locally
       delegate_to: localhost
@@ -46,3 +61,8 @@
       copy:
         content: "{{ pubkey.content | b64decode }}"
         dest: "./keys/{{ inventory_hostname }}.pub"
+      tags:
+        - ssh
+        - keys
+        - save
+        - control_node

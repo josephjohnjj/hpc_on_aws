@@ -622,6 +622,15 @@ Verify PBS is reachable from the login node:
 LDAP Integration
 ----------------------------
 
+LDAP (Lightweight Directory Access Protocol) is a protocol used for accessing and managing
+directory services over a network. It is commonly used for centralized authentication and
+authorization in enterprise environments. By integrating LDAP with a PBS cluster, user
+authentication and management can be centralized, making it easier to handle user accounts
+and permissions across multiple nodes in the cluster.
+
+Head Node LDAP Server Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 On the head node, install and configure OpenLDAP server:
 
@@ -861,6 +870,7 @@ Then make sure the `/etc/openldap/ldap.conf` file is configured to use TLS:
 
 
 
+
 LDAP Client Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -891,7 +901,7 @@ Enable and start the `oddjobd` service to support home directory creation:
 
     sudo systemctl enable --now oddjobd.service
     sudo systemctl status oddjobd.service
-    sudo systemctl enable --now oddjobd.service
+    
 
 
 Configure the LDAP client by editing the `/etc/openldap/ldap.conf` file:

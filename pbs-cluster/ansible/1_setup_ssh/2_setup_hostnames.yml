@@ -7,10 +7,17 @@
     - name: Compute dynamic hostname
       set_fact:
         dynamic_hostname: "node{{ groups['all'].index(inventory_hostname) + 1 }}"
+      tags:
+        - hostname
+        - facts
+        - setup
 
     - name: Set hostname using hostnamectl
       ansible.builtin.hostname:
         name: "{{ dynamic_hostname }}"
+      tags:
+        - hostname
+        - setup
 
     - name: Update /etc/hostname file
       copy:
@@ -19,6 +26,10 @@
         owner: root
         group: root
         mode: '0644'
+      tags:
+        - hostname
+        - setup
+        - etc
 
     - name: Ensure localhost and IPv6 entries are present in /etc/hosts
       blockinfile:
@@ -35,6 +46,10 @@
           ff02::3 ip6-allhosts
         create: yes
         marker: "# {mark} ANSIBLE MANAGED BLOCK"
+      tags:
+        - hosts
+        - etc
+        - ipv6
 
     - name: Add all nodes' IPs and hostnames to /etc/hosts
       lineinfile:
@@ -44,4 +59,7 @@
         state: present
       loop: "{{ groups['all'] }}"
       when: hostvars[item].ansible_default_ipv4 is defined
-
+      tags:
+        - hosts
+        - etc
+        - ips

@@ -16,6 +16,10 @@
         owner: "{{ target_user }}"
         group: "{{ target_user }}"
         mode: '0700'
+      tags:
+        - ssh
+        - setup
+        - directories
 
     - name: Ensure known_hosts file exists
       file:
@@ -24,6 +28,10 @@
         owner: "{{ target_user }}"
         group: "{{ target_user }}"
         mode: '0644'
+      tags:
+        - ssh
+        - setup
+        - known_hosts
 
     - name: Read all public keys from local keys directory
       delegate_to: localhost
@@ -32,6 +40,10 @@
         paths: "./keys"
         patterns: "*.pub"
       register: pubkey_files
+      tags:
+        - ssh
+        - keys
+        - read
 
     - name: Append each public key to authorized_keys on remote hosts
       authorized_key:
@@ -39,14 +51,26 @@
         key: "{{ lookup('file', item.path) }}"
         state: present
       loop: "{{ pubkey_files.files }}"
+      tags:
+        - ssh
+        - keys
+        - authorized_keys
 
     - name: Gather all EC2 private IPs
       set_fact:
         all_private_ips: "{{ groups['all'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}"
+      tags:
+        - ssh
+        - ips
+        - facts
 
     - name: Compute other nodes' private IPs for this host
       set_fact:
         other_private_ips: "{{ all_private_ips | difference([ansible_default_ipv4.address]) }}"
+      tags:
+        - ssh
+        - ips
+        - facts
 
     - name: Remove stale known_hosts entries for private IPs
       known_hosts:
@@ -55,6 +79,10 @@
         state: absent
       loop: "{{ other_private_ips }}"
       become_user: "{{ target_user }}"
+      tags:
+        - ssh
+        - known_hosts
+        - cleanup
 
     - name: Add other nodes' SSH host keys to known_hosts
       become_user: "{{ target_user }}"
@@ -65,6 +93,10 @@
       loop: "{{ other_private_ips }}"
       register: sshscan_output
       failed_when: sshscan_output.rc != 0 and sshscan_output.stdout == ""
+      tags:
+        - ssh
+        - known_hosts
+        - scan
 
     - name: Configure SSH client to avoid host key confirmation
       copy:
@@ -77,6 +109,10 @@
         owner: "{{ target_user }}"
         group: "{{ target_user }}"
         mode: '0600'
+      tags:
+        - ssh
+        - client
+        - config
 
     - name: Test SSH connection to other nodes
       become_user: "{{ target_user }}"
@@ -84,7 +120,15 @@
       loop: "{{ other_private_ips }}"
       register: ssh_test
       ignore_errors: true
+      tags:
+        - ssh
+        - test
+        - connectivity
 
     - name: Show SSH test results
       debug:
         var: ssh_test.results
+      tags:
+        - ssh
+        - test
+        - debug

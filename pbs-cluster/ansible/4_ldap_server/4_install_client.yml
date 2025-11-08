@@ -1,0 +1,173 @@
+---
+- name: Create /scratch/userhome on all nodes from login node
+  hosts: login, compute
+  become: yes
+  tasks:
+    - name: Ensure /scratch/userhome exists
+      file:
+        path: /scratch/userhome
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      tags:
+        - scratch
+        - setup
+      delegate_to: login
+      run_once: true
+
+    - name: Enable the 'plus' repository
+      command: dnf config-manager --set-enabled plus
+      register: plus_repo
+      changed_when: "'Nothing to do' not in plus_repo.stdout"
+      tags:
+        - ldap
+        - sssd
+        - repo
+
+    - name: Install required packages
+      dnf:
+        name:
+          - openldap-clients
+          - sssd
+          - sssd-ldap
+          - oddjob-mkhomedir
+        state: present
+        update_cache: yes
+      tags:
+        - ldap
+        - sssd
+        - install
+
+    - name: Configure authselect to use SSSD with mkhomedir
+      command: authselect select sssd with-mkhomedir --force
+      tags:
+        - ldap
+        - sssd
+        - authselect
+
+    - name: Enable and start oddjobd
+      systemd:
+        name: oddjobd
+        state: started
+        enabled: yes
+      tags:
+        - oddjob
+        - sssd
+        - service
+
+    - name: Ensure LDAP URI is set
+      lineinfile:
+        path: /etc/openldap/ldap.conf
+        regexp: '^URI'
+        line: 'URI ldap://node1/'
+        state: present
+        create: yes
+      tags:
+        - ldap
+        - ldap_conf
+        - uri
+
+    - name: Ensure LDAP BASE DN is set
+      lineinfile:
+        path: /etc/openldap/ldap.conf
+        regexp: '^BASE'
+        line: 'BASE dc=cluster,dc=lan'
+        state: present
+        create: yes
+      tags:
+        - ldap
+        - ldap_conf
+        - base
+
+
+    - name: Ensure /etc/sssd/sssd.conf exists with LDAP configuration
+      blockinfile:
+        path: /etc/sssd/sssd.conf
+        block: |
+          [domain/default]
+          id_provider = ldap
+          autofs_provider = ldap
+          auth_provider = ldap
+          chpass_provider = ldap
+
+          ldap_uri = ldap://node1/
+          ldap_search_base = dc=cluster,dc=lan
+
+          ldap_id_use_start_tls = True
+          ldap_tls_cacertdir = /etc/openldap/certs
+          cache_credentials = True
+          ldap_tls_reqcert = allow
+
+          [sssd]
+          services = nss, pam, autofs
+          domains = default
+
+          [nss]
+          homedir_substring = /scratch/userhome/%u
+        create: yes
+        owner: root
+        group: root
+        mode: '0600'
+      tags:
+        - sssd
+        - ldap
+        - configure
+
+
+    - name: Set permissions on /etc/sssd/sssd.conf
+      file:
+        path: /etc/sssd/sssd.conf
+        owner: root
+        group: root
+        mode: '0600'
+      tags:
+        - sssd
+        - permissions
+
+    - name: Enable and start SSSD service
+      systemd:
+        name: sssd
+        state: started
+        enabled: yes
+      tags:
+        - sssd
+        - service
+        - start
+
+  
+    - name: Clear SSSD cache
+      command: sss_cache -E
+      tags:
+        - sssd
+        - cache
+
+    - name: Set SELinux to permissive mode
+      command: setenforce 0
+      tags:
+        - selinux
+        - permissive
+
+
+
+    - name: Set PasswordAuthentication yes
+      lineinfile:
+        path: /etc/ssh/sshd_config.d/50-cloud-init.conf
+        regexp: '^PasswordAuthentication'
+        line: 'PasswordAuthentication yes'
+        state: present
+        create: yes
+        backup: yes
+      tags:
+        - ssh
+        - password_auth
+
+    - name: Restart SSH service to apply changes
+      systemd:
+        name: sshd
+        state: restarted
+      tags:
+        - ssh
+        - restart
+
+
