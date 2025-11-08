@@ -168,6 +168,6 @@
         state: restarted
       tags:
         - ssh
-        - restart
+        - sshrestart
 
 

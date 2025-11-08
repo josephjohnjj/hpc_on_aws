@@ -47,20 +47,17 @@
         - setdomain
      
     - name: Apply addou.ldif
-      command: ldapadd -x -D cn=Manager,dc=cluster,dc=lan -W -f /etc/openldap/ldif/addou.ldif
+      command: ldapadd -x -D cn=Manager,dc=cluster,dc=lan -w "ldappassword" -f /etc/openldap/ldif/addou.ldif
       tags:
         - ldap
         - addou
 
+    
     - name: Apply user1.ldif
-      hosts: control
-      become: yes
-      tasks:
-        - name: Apply user1.ldif
-          command: ldapadd -x -D cn=Manager,dc=cluster,dc=lan -W -f /etc/openldap/ldif/user1.ldif
-          tags:
-            - ldap
-            - user1
+      command: ldapadd -x -D cn=Manager,dc=cluster,dc=lan -w "ldappassword"  -f /etc/openldap/ldif/user1.ldif
+      tags:
+        - ldap
+        - user1
 
 
     - name: Ensure /etc/pki/tls directory exists
