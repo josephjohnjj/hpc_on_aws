@@ -4,6 +4,19 @@
   become: yes
   tasks:
 
+    - name: Set SELinux to permissive mode
+      command: setenforce 0
+      tags: disable_selinux
+
+    - name: Set SELINUX to disabled in /etc/selinux/config
+      ansible.builtin.lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUX='
+        line: 'SELINUX=disabled'
+        state: present
+        backrefs: yes
+      tags: disable_selinux
+
     - name: Update all packages
       ansible.builtin.dnf:
         name: "*"
@@ -29,7 +42,10 @@
         executable: /bin/bash
       tags: repo
 
-
+    - name: Reboot nodes
+      reboot:
+        reboot_timeout: 600
+        test_command: whoami
 
 
     - name: Install EPEL repository
@@ -52,11 +68,16 @@
           - ncurses-devel
           - make
           - cmake
+          - rpm-build
+          - libtool
           - gcc
           - gcc-c++
           - libX11-devel
           - libXt-devel
+          - libXext
           - libXext-devel
+          - autoconf
+          - automake
           - libXmu-devel
           - tcl-devel
           - tk-devel
@@ -67,12 +88,15 @@
           - python3-devel
           - perl
           - expat-devel
+          - openssl-devel
           - hwloc-devel
           - java-21-openjdk-devel
           - cjson-devel
           - swig
           - swig-doc
           - vim
+          - sendmail
+          - chkconfig
         state: present
         update_cache: yes
       tags: packages

@@ -1,6 +1,6 @@
 ---
 - name: Build and install OpenPBS on all nodes
-  hosts: all
+  hosts: control, compute, login
   become: yes
   vars:
     pbs_repo: "https://github.com/openpbs/openpbs.git"
@@ -8,11 +8,20 @@
     pbs_src_dir: "/tmp/openpbs"
 
   tasks:
-    - name: Ensure git is installed
+    - name: Install build dependencies
       ansible.builtin.dnf:
-        name: git
+        name:
+          - git
+          - gcc
+          - make
+          - autoconf
+          - automake
+          - libtool
+          - rpm-build
+          - rpmdevtools
+          - wget
         state: present
-      tags: git
+      tags: deps
 
     - name: Clone OpenPBS repository
       ansible.builtin.git:
@@ -34,7 +43,7 @@
         chdir: "{{ pbs_src_dir }}"
       tags: configure
 
-    - name: Build OpenPBS using all CPU cores
+    - name: Build OpenPBS
       ansible.builtin.shell: make -j"$(nproc)"
       args:
         chdir: "{{ pbs_src_dir }}"
@@ -56,10 +65,4 @@
         owner: root
         group: root
         mode: "0644"
-      tags: pbs_env
-
-    - name: Source PBS environment for current session
-      ansible.builtin.shell: source /etc/profile.d/pbs.sh
-      args:
-        executable: /bin/bash
       tags: pbs_env

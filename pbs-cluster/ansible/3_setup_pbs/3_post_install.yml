@@ -1,0 +1,30 @@
+---
+- name: Set PBS server name on all nodes
+  hosts: control, compute, login
+  become: yes
+  tasks:
+
+    - name: Apply setuid permission to PBS binaries
+      ansible.builtin.file:
+        path: "{{ item }}"
+        mode: '4755'
+      loop:
+        - /opt/pbs/sbin/pbs_iff
+        - /opt/pbs/sbin/pbs_rcp
+      tags: fix_pbs_permissions
+
+
+    - name: Execute PBS post-installation script
+      ansible.builtin.command: /opt/pbs/libexec/pbs_postinstall
+      tags: pbs_postinstall
+
+    
+    - name: Write PBS server name to /var/spool/pbs/server_name
+      ansible.builtin.shell: echo "node1" > /var/spool/pbs/server_name
+      args:
+        executable: /bin/bash
+      tags:
+        - pbs
+        - set_server_name
+
+

@@ -1,7 +1,0 @@
----
-# master_setup.yml
-- import_playbook: 1_install_packages.yml
-- import_playbook: 2_build_pbs.yml
-- import_playbook: 3_update_conf.yml
-- import_playbook: 4_start_pbs.yml
-- import_playbook: 5_add_compute_nodes.yml
