@@ -1,0 +1,21 @@
+dn: uid=testuser1,ou=People,dc=cluster,dc=lan
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+cn: testuser1
+sn: user
+userPassword: {SSHA}yJcv+xLWUvgAWu+fdNN/K6V4cdS4PC5E
+loginShell: /bin/bash
+uidNumber: 2001
+gidNumber: 2001
+homeDirectory: /scratch/userhome/testuser1
+shadowLastChange: 0
+shadowMax: 0
+shadowWarning: 0
+
+dn: cn=testuser1,ou=Group,dc=cluster,dc=lan
+objectClass: posixGroup
+cn: testuser1
+gidNumber: 2001
+memberUid: testuser1
+

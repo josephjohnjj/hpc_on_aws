@@ -1,5 +1,0 @@
-dn: cn=nciuser,ou=Groups,dc=ncitraininf,dc=local
-objectClass: top
-objectClass: posixGroup
-cn: nciuser
-gidNumber: 10500
