@@ -1,0 +1,85 @@
+# ---------------------------------------------------------
+# Clone Spack into /apps
+# ---------------------------------------------------------
+- name: Install Spack into /apps/spack
+  hosts: ec2
+  become: yes
+  gather_facts: no  # previously gathered
+  vars:
+    app_dir: /apps
+    git_repo: "https://github.com/spack/spack.git"
+
+  tasks:
+    # Create the /apps directory with user ownership
+    - name: Create /apps directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0755"
+
+    # Clone the Spack repository into /apps/spack
+    - name: Clone spack repo into /apps/spack if not present
+      git:
+        repo: "{{ git_repo }}"
+        dest: "{{ app_dir }}/spack"
+      become_user: "{{ ansible_user }}"
+
+
+# ---------------------------------------------------------
+# Set Ownership of /apps to the Current User
+# ---------------------------------------------------------
+- name: Set ownership of /apps to the current user
+  hosts: ec2
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Set recursive ownership of /apps
+      file:
+        path: /apps
+        state: directory
+        recurse: yes
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+
+# ---------------------------------------------------------
+# Make Spack Available System-Wide
+# ---------------------------------------------------------
+- name: Make Spack environment available system-wide
+  hosts: ec2
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    # Create a shell script to auto-source Spack for all users
+    - name: Create /etc/profile.d/spack.sh with Spack environment setup
+      copy:
+        dest: /etc/profile.d/spack.sh
+        content: |
+          export SPACK_ROOT=/apps/spack
+          . $SPACK_ROOT/share/spack/setup-env.sh
+        owner: root
+        group: root
+        mode: '0644'
+
+
+# ---------------------------------------------------------
+# Run Spack and Print Its Version
+# ---------------------------------------------------------
+- name: Run a command with Spack environment activated
+  hosts: ec2
+  become: yes
+  gather_facts: no
+
+  tasks:
+    - name: Print Spack version
+      shell: . /etc/profile.d/spack.sh && spack --version
+      register: spack_version
+      changed_when: false
+
+    - name: Show Spack version output
+      debug:
+        var: spack_version.stdout

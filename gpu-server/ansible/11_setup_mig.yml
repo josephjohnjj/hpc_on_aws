@@ -1,0 +1,61 @@
+# ---------------------------------------------------------
+# Enable MIG Mode on All NVIDIA GPUs
+# ---------------------------------------------------------
+- name: Enable MIG mode on all detected NVIDIA GPUs and report status
+  hosts: ec2
+  become: yes
+  gather_facts: no
+
+  tasks:
+    # Ensure `nvidia-smi` command is available
+    - name: Check if nvidia-smi is installed
+      command: which nvidia-smi
+      register: nvidia_smi_check
+      changed_when: false
+      failed_when: nvidia_smi_check.rc != 0
+      ignore_errors: yes
+
+    # Explicitly fail if nvidia-smi was not found
+    - name: Fail if nvidia-smi is not installed
+      fail:
+        msg: "nvidia-smi not found on this host. Cannot proceed."
+      when: nvidia_smi_check.rc != 0
+
+    # Count the number of GPUs detected
+    - name: Get number of GPUs
+      command: nvidia-smi --list-gpus
+      register: gpu_list
+      changed_when: false
+
+    - name: Set GPU count fact
+      set_fact:
+        gpu_count: "{{ gpu_list.stdout_lines | length }}"
+
+    - name: Debug GPU count
+      debug:
+        msg: "Detected {{ gpu_count }} GPUs"
+
+    # Enable MIG mode on each GPU
+    - name: Enable MIG mode on each GPU
+      shell: nvidia-smi -i {{ item }} -mig 1
+      with_sequence: start=0 end={{ gpu_count | int - 1 }}
+      register: mig_enable_results
+
+    - name: Report results of enabling MIG
+      debug:
+        var: mig_enable_results.results
+
+    - name: Show current MIG status for all GPUs
+      shell: nvidia-smi -L
+      register: mig_status
+      changed_when: false
+
+    - name: Print MIG status
+      debug:
+        var: mig_status.stdout_lines
+
+    # Reboot system to finalize MIG mode
+    - name: Reboot the machine to apply MIG mode
+      reboot:
+        reboot_timeout: 600
+        test_command: nvidia-smi
