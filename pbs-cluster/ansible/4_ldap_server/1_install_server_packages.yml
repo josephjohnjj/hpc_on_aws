@@ -4,31 +4,7 @@
   become: yes
   tasks:
 
-    - name: Enable the 'plus' repository
-      ansible.builtin.command:
-        cmd: dnf config-manager --set-enabled plus
-      register: enable_plus_repo
-      changed_when: "'Nothing to do' not in enable_plus_repo.stdout"
-      tags:
-        - ldap
-        - repo
-        - enable_plus_repo
-
-    - name: List enabled repositories
-      ansible.builtin.command:
-        cmd: dnf repolist
-      register: repo_list
-      changed_when: false
-      tags:
-        - ldap
-        - repo
-        - repolist
-
-    - name: Reboot nodes
-      reboot:
-        reboot_timeout: 600
-        test_command: whoami
-
+    
     - name: Install OpenLDAP server and client packages
       ansible.builtin.dnf:
         name:
