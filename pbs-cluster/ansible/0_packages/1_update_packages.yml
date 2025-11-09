@@ -1,71 +1,75 @@
----
-- name: Update packages on  on all nodes
+- name: Update packages safely on all nodes
   hosts: all
   become: yes
   tasks:
-    - name: Set SELinux to permissive mode
+
+    - name: Set SELinux to permissive
       command: setenforce 0
+      ignore_errors: yes
       tags: disable_selinux
 
-    - name: Set SELINUX to disabled in /etc/selinux/config
-      ansible.builtin.lineinfile:
+    - name: Disable SELinux in config
+      lineinfile:
         path: /etc/selinux/config
         regexp: "^SELINUX="
         line: "SELINUX=disabled"
         state: present
         backrefs: yes
+      ignore_errors: yes
       tags: disable_selinux
 
-    - name: Enable CRB repository
-      ansible.builtin.shell: dnf config-manager --set-enabled crb
+    - name: Enable CRB and Plus repositories
+      shell: |
+        dnf config-manager --set-enabled crb
+        dnf config-manager --set-enabled plus
       args:
         executable: /bin/bash
       tags: repo
 
-    - name: Enable plus repository
-      ansible.builtin.shell: dnf config-manager --set-enabled plus
+    - name: Clean and rebuild DNF cache
+      shell: |
+        dnf clean all
+        dnf makecache
       args:
         executable: /bin/bash
-      tags: repo
+      tags: dnf
 
-    - name: Update all packages
-      ansible.builtin.dnf:
+    - name: Update glibc and core libraries first
+      dnf:
+        name:
+          - glibc
+          - glibc-devel
+          - glibc-common
+        state: latest
+      tags: core
+
+    - name: Update all other packages
+      dnf:
         name: "*"
         state: latest
       tags: update
 
-  
     - name: Install EPEL repository
-      ansible.builtin.dnf:
+      dnf:
         name: epel-release
         state: present
       tags: epel
 
-    - name: Clean all DNF caches
-      ansible.builtin.shell: dnf clean all
+    - name: Synchronize all packages to distro versions
+      ansible.builtin.shell: dnf distro-sync -y
       args:
         executable: /bin/bash
-      tags: dnf
+      tags: distro_sync
+      ignore_errors: yes
 
-    - name: Rebuild DNF cache
-      ansible.builtin.shell: dnf makecache
-      args:
-        executable: /bin/bash
-      tags: dnf
-
-    - name: Reboot nodes
-      reboot:
-        reboot_timeout: 600
-        test_command: whoami
-      tags: reboot
 
     - name: Install Development Tools group
-      ansible.builtin.dnf:
+      dnf:
         name: "@Development Tools"
         state: present
       tags: devtools
 
-    - name: Install required packages
+    - name: Install additional packages
       dnf:
         name:
           - wget
@@ -83,12 +87,10 @@
           - cmake
           - chkconfig
         state: present
-      tags:
-        - packages
-    
+      tags: packages
+
     - name: Reboot nodes
       reboot:
         reboot_timeout: 600
         test_command: whoami
       tags: reboot
-
