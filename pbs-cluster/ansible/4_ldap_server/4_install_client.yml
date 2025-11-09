@@ -1,6 +1,6 @@
 ---
-- name: Create /scratch/userhome on all nodes from login node
-  hosts: login, compute
+- name: Create /scratch/userhome on login node
+  hosts: login
   become: yes
   tasks:
     - name: Ensure /scratch/userhome exists
@@ -13,8 +13,12 @@
       tags:
         - scratch
         - setup
-      delegate_to: login
-      run_once: true
+
+
+- name: Setup LDAP client and SSSD on compute and login nodes
+  hosts: login, compute
+  become: yes
+  tasks:
 
     - name: Install required packages
       dnf:
@@ -132,13 +136,6 @@
       tags:
         - sssd
         - cache
-
-    - name: Set SELinux to permissive mode
-      command: setenforce 0
-      tags:
-        - selinux
-        - permissive
-
 
 
     - name: Set PasswordAuthentication yes
