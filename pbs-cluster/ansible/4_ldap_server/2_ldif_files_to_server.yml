@@ -9,7 +9,7 @@
       - setdomain.ldif
       - tls.ldif
       - user1.ldif
-    ldif_src_dir: "{{ playbook_dir }}/../ldap_files"
+    ldif_src_dir: "{{ playbook_dir }}/ldap_files"
     ldif_dest_dir: /etc/openldap/ldif
   tasks:
 
