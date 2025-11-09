@@ -45,9 +45,7 @@
       args:
         executable: /bin/bash
       tags: dnf
-
-    
-
+      
     - name: Reboot nodes
       reboot:
         reboot_timeout: 600
