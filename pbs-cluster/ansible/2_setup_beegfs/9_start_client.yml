@@ -9,22 +9,7 @@
     - start
   tasks:
 
-    - name: Install required build tools and matching kernel headers
-      dnf:
-        name:
-          - gcc
-          - make
-          - perl
-          - kernel-devel-{{ ansible_kernel }}
-          - kernel-headers-{{ ansible_kernel }}
-        state: present
-
-    - name: Reboot node if kernel was updated
-      reboot:
-        reboot_timeout: 600
-        test_command: whoami
-      when: ansible_kernel != ansible_facts['kernel']
-
+    
     - name: Start beegfs-client service
       systemd:
         name: beegfs-client
