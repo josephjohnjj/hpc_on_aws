@@ -1,8 +1,0 @@
-dn: ou=Groups,dc=ncitraininf,dc=local
-objectClass: organizationalUnit
-ou: Groups
-
-dn: ou=nci_ou,dc=ncitraininf,dc=local
-objectClass: organizationalUnit
-ou: nci_ou
-
