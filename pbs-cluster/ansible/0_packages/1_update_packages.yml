@@ -34,6 +34,13 @@
         state: latest
       tags: update
 
+  
+    - name: Install EPEL repository
+      ansible.builtin.dnf:
+        name: epel-release
+        state: present
+      tags: epel
+
     - name: Clean all DNF caches
       ansible.builtin.shell: dnf clean all
       args:
@@ -45,18 +52,12 @@
       args:
         executable: /bin/bash
       tags: dnf
-      
+
     - name: Reboot nodes
       reboot:
         reboot_timeout: 600
         test_command: whoami
       tags: reboot
-
-    - name: Install EPEL repository
-      ansible.builtin.dnf:
-        name: epel-release
-        state: present
-      tags: epel
 
     - name: Install Development Tools group
       ansible.builtin.dnf:
@@ -84,4 +85,10 @@
         state: present
       tags:
         - packages
+    
+    - name: Reboot nodes
+      reboot:
+        reboot_timeout: 600
+        test_command: whoami
+      tags: reboot
 
