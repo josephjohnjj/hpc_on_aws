@@ -4,24 +4,6 @@
   become: yes
   tasks:
 
-    - name: Set SELinux to permissive mode
-      command: setenforce 0
-      tags: disable_selinux
-
-    - name: Set SELINUX to disabled in /etc/selinux/config
-      ansible.builtin.lineinfile:
-        path: /etc/selinux/config
-        regexp: '^SELINUX='
-        line: 'SELINUX=disabled'
-        state: present
-        backrefs: yes
-      tags: disable_selinux
-
-    - name: Update all packages
-      ansible.builtin.dnf:
-        name: "*"
-        state: latest
-      tags: update
 
     - name: Clean all DNF caches
       ansible.builtin.shell: dnf clean all
@@ -35,30 +17,11 @@
         executable: /bin/bash
       tags: dnf
 
-
-    - name: Enable CRB repository
-      ansible.builtin.shell: dnf config-manager --set-enabled crb
-      args:
-        executable: /bin/bash
-      tags: repo
-
     - name: Reboot nodes
       reboot:
         reboot_timeout: 600
         test_command: whoami
 
-
-    - name: Install EPEL repository
-      ansible.builtin.dnf:
-        name: epel-release
-        state: present
-      tags: epel
-
-    - name: Install Development Tools group
-      ansible.builtin.dnf:
-        name: "@Development Tools"
-        state: present
-      tags: devtools
 
     - name: Install required packages
       ansible.builtin.dnf:
