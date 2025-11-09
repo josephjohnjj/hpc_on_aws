@@ -16,15 +16,6 @@
       delegate_to: login
       run_once: true
 
-    - name: Enable the 'plus' repository
-      command: dnf config-manager --set-enabled plus
-      register: plus_repo
-      changed_when: "'Nothing to do' not in plus_repo.stdout"
-      tags:
-        - ldap
-        - sssd
-        - repo
-
     - name: Install required packages
       dnf:
         name:
