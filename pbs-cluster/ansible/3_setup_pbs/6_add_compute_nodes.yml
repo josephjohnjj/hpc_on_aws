@@ -26,3 +26,15 @@
       ansible.builtin.debug:
         var: pbs_nodes.stdout_lines
       tags: show_nodes
+
+    - name: Set default queue to workq
+      ansible.builtin.command:
+        cmd: /opt/pbs/bin/qmgr -c "set server default_queue = workq"
+
+    - name: Set default select resources to 1
+      ansible.builtin.command:
+        cmd: /opt/pbs/bin/qmgr -c "set server resources_default.select = 1"
+
+    - name: Enable flatuid on PBS server
+      ansible.builtin.command:
+        cmd: /opt/pbs/bin/qmgr -c "set server flatuid = True"
