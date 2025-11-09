@@ -1,28 +1,4 @@
 ---
-- name: Ensure latest kernel and headers are installed and in use
-  hosts: all
-  become: yes
-  tasks:
-    - name: Install latest kernel and headers
-      ansible.builtin.dnf:
-        name:
-          - kernel
-          - kernel-devel
-          - kernel-headers
-        state: latest
-
-    - name: Reboot nodes to apply new kernel
-      ansible.builtin.reboot:
-        reboot_timeout: 600
-        msg: "Rebooting to apply latest kernel and header versions"
-
-    - name: Verify running kernel after reboot
-      ansible.builtin.command: uname -r
-      register: kernel_version
-
-    - name: Display running kernel version
-      ansible.builtin.debug:
-        msg: "Node {{ inventory_hostname }} running kernel {{ kernel_version.stdout }}"
 
 - name: Setup Red Hat node for BeeGFS
   hosts: all
@@ -30,6 +6,7 @@
   gather_facts: yes
 
   tasks:
+
 
     - name: Clean all DNF caches
       ansible.builtin.shell: dnf clean all
