@@ -6,8 +6,8 @@
     pbs_exec: /opt/pbs
     compute_nodes:
       - node3
+      - node4
       - node5
-      - node6
 
   tasks:
     - name: Create PBS compute nodes

@@ -101,18 +101,4 @@
         update_cache: yes
       tags: packages
 
-    - name: Create PBS environment file
-      ansible.builtin.copy:
-        dest: /etc/profile.d/pbs.sh
-        content: |
-          export PATH=/opt/pbs/bin:/opt/pbs/sbin:$PATH
-        owner: root
-        group: root
-        mode: '0644'
-      tags: pbs_env
-
-    - name: Source PBS environment for current session
-      ansible.builtin.shell: source /etc/profile.d/pbs.sh
-      args:
-        executable: /bin/bash
-      tags: pbs_env
+    

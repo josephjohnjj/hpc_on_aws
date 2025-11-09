@@ -1,5 +1,5 @@
 ---
-- name: Configure PBS on head node
+- name: Update config on PBS on head node
   hosts: control
   become: yes
   vars:
@@ -8,7 +8,7 @@
     pbs_home: /var/spool/pbs
     pbs_server: node1
   tasks:
-    - name: Configure PBS on head node
+    - name: Update config on PBS on head node
       ansible.builtin.copy:
         dest: "{{ pbs_conf_path }}"
         content: |
@@ -26,7 +26,7 @@
         mode: "0644"
       tags: pbs_conf
 
-- name: Configure PBS on compute nodes
+- name: Update config on PBS on compute nodes
   hosts: compute
   become: yes
   vars:
@@ -35,7 +35,7 @@
     pbs_home: /var/spool/pbs
     pbs_server: node1
   tasks:
-    - name: Configure PBS on compute node
+    - name: Update config on PBS on compute node
       ansible.builtin.copy:
         dest: "{{ pbs_conf_path }}"
         content: |
@@ -51,7 +51,7 @@
         mode: "0644"
       tags: pbs_conf
 
-- name: Configure PBS on login nodes
+- name: Update config on PBS on login nodes
   hosts: login
   become: yes
   vars:
@@ -60,7 +60,7 @@
     pbs_home: /var/spool/pbs
     pbs_server: node1
   tasks:
-    - name: Configure PBS on login node
+    - name: Update config on PBS on login node
       ansible.builtin.copy:
         dest: "{{ pbs_conf_path }}"
         content: |
