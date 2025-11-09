@@ -1,16 +1,15 @@
 ---
-- name: Copy LDIF files to control node
+- name: Copy and prepare LDIF files for LDAP setup
   hosts: control
   become: true
+
   vars:
-    ldif_files:
-      - addou.ldif
-      - changerootpass.ldif
-      - setdomain.ldif
-      - tls.ldif
-      - user1.ldif
     ldif_src_dir: "{{ playbook_dir }}/ldap_files"
     ldif_dest_dir: /etc/openldap/ldif
+
+    ldap_root_password: "ldappassword"
+    ldap_user1_password: "testuser"
+
   tasks:
 
     - name: Ensure LDIF destination directory exists
@@ -25,14 +24,78 @@
         - setup
         - create_ldif_dir
 
-    - name: Copy each LDIF file to control node
+
+    - name: Generate SSHA hash for LDAP root password
+      command: "slappasswd -s {{ ldap_root_password }}"
+      register: rootpw
+      changed_when: false
+      tags:
+        - ldap
+        - generate_hash
+
+    - name: Generate SSHA hash for user1 password
+      command: "slappasswd -s {{ ldap_user1_password }}"
+      register: user1pw
+      changed_when: false
+      tags:
+        - ldap
+        - generate_hash
+
+
+    - name: Template changerootpass.ldif
+      template:
+        src: "{{ ldif_src_dir }}/changerootpass.ldif.j2"
+        dest: "{{ ldif_dest_dir }}/changerootpass.ldif"
+        owner: root
+        group: root
+        mode: "0644"
+      vars:
+        rootpw_hash: "{{ rootpw.stdout }}"
+      tags:
+        - ldap
+        - copy
+        - ldif_files
+
+    - name: Template setdomain.ldif
+      template:
+        src: "{{ ldif_src_dir }}/setdomain.ldif.j2"
+        dest: "{{ ldif_dest_dir }}/setdomain.ldif"
+        owner: root
+        group: root
+        mode: "0644"
+      vars:
+        rootpw_hash: "{{ rootpw.stdout }}"
+      tags:
+        - ldap
+        - copy
+        - ldif_files
+
+    - name: Template user1.ldif
+      template:
+        src: "{{ ldif_src_dir }}/user1.ldif.j2"
+        dest: "{{ ldif_dest_dir }}/user1.ldif"
+        owner: root
+        group: root
+        mode: "0644"
+      vars:
+        user1pw_hash: "{{ user1pw.stdout }}"
+      tags:
+        - ldap
+        - copy
+        - ldif_files
+
+
+
+    - name: Copy static LDIF files
       copy:
         src: "{{ ldif_src_dir }}/{{ item }}"
         dest: "{{ ldif_dest_dir }}/{{ item }}"
         owner: root
         group: root
         mode: "0644"
-      loop: "{{ ldif_files }}"
+      loop:
+        - addou.ldif
+        - tls.ldif
       tags:
         - ldap
         - copy
