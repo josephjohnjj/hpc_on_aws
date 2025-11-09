@@ -619,6 +619,14 @@ Verify PBS is reachable from the login node:
     
     sudo /opt/pbs/bin/qstat -B
 
+On the head node, set some default server parameters:
+
+.. code-block:: bash
+
+    sudo /opt/pbs/bin/qmgr -c "set server default_queue = workq"
+    sudo /opt/pbs/bin/qmgr -c "set server resources_default.select = 1"
+    sudo /opt/pbs/bin/qmgr -c "set server flatuid = True"
+
 
 LDAP Integration
 ----------------------------
