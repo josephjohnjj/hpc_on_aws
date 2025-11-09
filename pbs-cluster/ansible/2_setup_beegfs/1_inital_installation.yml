@@ -30,13 +30,28 @@
   gather_facts: yes
 
   tasks:
+
+    - name: Clean all DNF caches
+      ansible.builtin.shell: dnf clean all
+      args:
+        executable: /bin/bash
+      tags: dnf
+
+    - name: Rebuild DNF cache
+      ansible.builtin.shell: dnf makecache
+      args:
+        executable: /bin/bash
+      tags: dnf
+
+    - name: Reboot nodes
+      reboot:
+        reboot_timeout: 600
+        test_command: whoami
+      tags: reboot
     
     - name: Install required packages
       dnf:
         name:
-          - wget
-          - vim
-          - "@Development Tools" # Installs gcc, make, etc.
           - "kernel-devel-{{ ansible_kernel }}"
           - "kernel-headers-{{ ansible_kernel }}"
         state: present
