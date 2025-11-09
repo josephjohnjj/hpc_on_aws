@@ -66,27 +66,18 @@
           - libedit-devel
           - libical-devel
           - ncurses-devel
-          - make
-          - cmake
           - rpm-build
           - libtool
-          - gcc
-          - gcc-c++
           - libX11-devel
           - libXt-devel
           - libXext
           - libXext-devel
-          - autoconf
-          - automake
           - libXmu-devel
           - tcl-devel
           - tk-devel
           - postgresql-devel
           - postgresql-server
           - postgresql-contrib
-          - python3
-          - python3-devel
-          - perl
           - expat-devel
           - openssl-devel
           - hwloc-devel
@@ -94,9 +85,7 @@
           - cjson-devel
           - swig
           - swig-doc
-          - vim
           - sendmail
-          - chkconfig
         state: present
         update_cache: yes
       tags: packages
