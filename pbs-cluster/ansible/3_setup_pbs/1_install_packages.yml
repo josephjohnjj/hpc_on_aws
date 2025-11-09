@@ -5,24 +5,6 @@
   tasks:
 
 
-    - name: Clean all DNF caches
-      ansible.builtin.shell: dnf clean all
-      args:
-        executable: /bin/bash
-      tags: dnf
-
-    - name: Rebuild DNF cache
-      ansible.builtin.shell: dnf makecache
-      args:
-        executable: /bin/bash
-      tags: dnf
-
-    - name: Reboot nodes
-      reboot:
-        reboot_timeout: 600
-        test_command: whoami
-
-
     - name: Install required packages
       ansible.builtin.dnf:
         name:
