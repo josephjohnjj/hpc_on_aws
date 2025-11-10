@@ -547,7 +547,28 @@ If it doesnt alreadt exist - create the required directories and set permissions
     sudo sh -c 'echo "node1" > /var/spool/pbs/server_name'
 
 
-Once installed, configure PBS by editing the configuration file. Edit the file `sudo vim /etc/pbs.conf`
+Once installed, configure PBS by editing the configuration file. 
+
+
++--------+-------------------------------+----------------------------------------+-----------------------------------------------------------+-------------------------------------------+
+| Option | Host Role                      | Task                                   | Package Contents                                         | Parameters in pbs.conf For Default Start  |
++========+===============================+========================================+===========================================================+===========================================+
+| 1      | Server host, headnode, front   | Runs server, scheduler, and            | Server/scheduler/communication/MoM/client commands      | PBS_START_SERVER=1                        |
+|        | end machine                    | communication daemons. Optionally      | If using failover, install on both server hosts.        | PBS_START_SCHED=1                         |
+|        |                               | runs MoM daemon. Client commands       |                                                           | PBS_START_COMM=1                          |
+|        |                               | are included.                          |                                                           | To run MoM, add: PBS_START_MOM=1         |
++--------+-------------------------------+----------------------------------------+-----------------------------------------------------------+-------------------------------------------+
+| 2      | Execution host, MoM host       | Runs MoM. Executes job tasks.          | Execution/client commands                                | PBS_START_MOM=1                           |
+|        |                               | Client commands are included.          | Install on each execution host.                          |                                           |
++--------+-------------------------------+----------------------------------------+-----------------------------------------------------------+-------------------------------------------+
+| 3      | Client host, submit host,      | Users can run PBS commands and view    | Client commands                                          | None                                      |
+|        | submission host                | man pages.                             | Install on each client host.                              |                                           |
++--------+-------------------------------+----------------------------------------+-----------------------------------------------------------+-------------------------------------------+
+
+
+
+
+Edit the file `sudo vim /etc/pbs.conf`
 On the head node, set the following parameters:
 
 .. code-block:: bash
