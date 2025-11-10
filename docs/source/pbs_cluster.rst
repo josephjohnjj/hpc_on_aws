@@ -1021,6 +1021,212 @@ Now, you should be able to log in using the LDAP user credentials. Try logging i
 
 
 
+Installing Prometheus and Grafana
+----------------------------
+
+Prometheus is an open-source monitoring and alerting toolkit designed for reliability and scalability.
+It collects and stores metrics as time-series data, allowing users to query and visualize the data
+for monitoring system performance and health.
+
+Grafana is an open-source data visualization and monitoring platform that integrates with various data
+sources, including Prometheus. It provides a user-friendly interface for creating interactive dashboards,
+visualizing metrics, and setting up alerts to monitor the health and performance of systems and applications.
+
+Installing Prometheus
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+.. code-block:: bash
+
+    sudo useradd --system --no-create-home --shell /usr/sbin/nologin prometheus
+    id prometheus
+
+
+.. code-block:: bash
+
+    cd /tmp
+    wget https://github.com/prometheus/prometheus/releases/download/v3.5.0/prometheus-3.5.0.linux-amd64.tar.gz
+    sudo tar -xvf /tmp/prometheus-3.5.0.linux-amd64.tar.gz -C /opt/
+
+.. code-block:: bash
+
+    sudo ln -s /opt/prometheus-3.5.0.linux-amd64/prometheus /usr/local/bin/prometheus
+    sudo ln -s /opt/prometheus-3.5.0.linux-amd64/promtool /usr/local/bin/promtool
+
+
+.. code-block:: bash
+
+    prometheus --version
+    promtool --version
+
+
+.. code-block:: bash
+
+    sudo mkdir -p /etc/prometheus
+    sudo mkdir -p /var/lib/prometheus
+    sudo chown -R prometheus:prometheus /etc/prometheus /var/lib/prometheus
+
+.. code-block:: bash
+
+    sudo vim /etc/prometheus/prometheus.yml
+
+
+    global:
+        scrape_interval: 15s
+
+    scrape_configs:
+      - job_name: 'node_exporters'
+        static_configs:
+          - targets: ['node1:9100', 'node2:9100', 'node3:9100', 'node4:9100', 'node5:9100', 'node6:9100', 'node7:9100']
+
+
+.. code-block:: bash
+
+    sudo chown prometheus:prometheus /etc/prometheus/prometheus.yml
+    sudo chmod 644 /etc/prometheus/prometheus.yml
+
+
+.. code-block:: bash
+
+    sudo vim /etc/systemd/system/prometheus.service
+
+    [Unit]
+    Description=Prometheus
+    Wants=network-online.target
+    After=network-online.target
+
+    [Service]
+    User=prometheus
+    Group=prometheus
+    ExecStart=/usr/local/bin/prometheus \
+      --config.file=/etc/prometheus/prometheus.yml \
+      --storage.tsdb.path=/var/lib/prometheus \
+      --web.listen-address=:9090
+
+    Restart=on-failure
+
+    [Install]
+    WantedBy=multi-user.target
+
+
+.. code-block:: bash
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now prometheus
+    sudo systemctl status prometheus
+
+
+Installing Node Exporter
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+.. code-block:: bash
+
+    sudo useradd --system --no-create-home --shell /usr/sbin/nologin node_exporter
+    id node_exporter
+
+
+.. code-block:: bash
+
+    cd /tmp
+    wget https://github.com/prometheus/node_exporter/releases/download/v1.10.2/node_exporter-1.10.2.linux-amd64.tar.gz
+    sudo tar -xvf /tmp/node_exporter-1.10.2.linux-amd64.tar.gz -C /opt/
+
+
+.. code-block:: bash
+
+    sudo ln -s /opt/node_exporter-1.10.2.linux-amd64/node_exporter /usr/local/bin/node_exporter
+    /usr/local/bin/node_exporter --version
+
+
+.. code-block:: bash
+
+    sudo vim /etc/systemd/system/node_exporter.service
+
+
+    [Unit]
+    Description=Node Exporter
+    After=network.target
+
+    [Service]
+    User=node_exporter
+    Group=node_exporter
+    Type=simple
+    ExecStart=/usr/local/bin/node_exporter
+    Restart=always
+    RestartSec=5s
+
+    [Install]
+    WantedBy=multi-user.target
+
+
+.. code-block:: bash
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now node_exporter
+    sudo systemctl status node_exporter
+
+
+Installing Grafana
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: bash
+    
+
+
+    cd /tmp
+    wget -q -O gpg.key https://rpm.grafana.com/gpg.key
+    sudo rpm --import gpg.key
+
+.. code-block:: bash
+
+    sudo /etc/yum.repos.d/grafana.repo
+
+    [grafana]
+    name=grafana
+    baseurl=https://rpm.grafana.com
+    repo_gpgcheck=1
+    enabled=1
+    gpgcheck=1
+    gpgkey=https://rpm.grafana.com/gpg.key
+    sslverify=1
+    sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+
+.. code-block:: bash
+
+    sudo dnf install grafana -y 
+    grafana-server -v
+
+
+.. code-block:: bash
+
+    sudo systemctl enable --now grafana-server
+    sudo systemctl status grafana-server
+
+Access Grafana Web Interface using
+
+
+.. code-block:: bash
+
+    http://<ip-of-management-node>:3000
+
+The default username and password are both `admin`. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

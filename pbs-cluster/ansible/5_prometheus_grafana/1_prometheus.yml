@@ -1,0 +1,140 @@
+---
+- name: Install and Configure Prometheus
+  hosts: control
+  become: true
+  vars:
+    prometheus_version: "3.5.0"
+    prometheus_user: "prometheus"
+    prometheus_group: "prometheus"
+    prometheus_install_dir: "/opt"
+    prometheus_data_dir: "/var/lib/prometheus"
+    prometheus_config_dir: "/etc/prometheus"
+    prometheus_service_file: "/etc/systemd/system/prometheus.service"
+    prometheus_targets:
+      - "node1:9100"
+      - "node2:9100"
+      - "node3:9100"
+      - "node4:9100"
+      - "node5:9100"
+      - "node6:9100"
+      - "node7:9100"
+
+  tasks:
+    - name: Ensure Prometheus system user exists
+      ansible.builtin.user:
+        name: "{{ prometheus_user }}"
+        system: yes
+        shell: /usr/sbin/nologin
+        create_home: no
+      tags:
+        - prometheus
+        - user
+        - setup
+
+    - name: Download Prometheus tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+        dest: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+        mode: "0644"
+      tags:
+        - prometheus
+        - download
+        - setup
+
+    - name: Extract Prometheus tarball to /opt
+      ansible.builtin.unarchive:
+        src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+        dest: "{{ prometheus_install_dir }}"
+        remote_src: yes
+      tags:
+        - prometheus
+        - extract
+        - setup
+
+    - name: Create symlinks for Prometheus binaries
+      ansible.builtin.file:
+        src: "{{ prometheus_install_dir }}/prometheus-{{ prometheus_version }}.linux-amd64/{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
+        state: link
+      loop:
+        - prometheus
+        - promtool
+      tags:
+        - prometheus
+        - symlink
+        - setup
+
+    - name: Ensure Prometheus directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ prometheus_user }}"
+        group: "{{ prometheus_group }}"
+        mode: "0755"
+      loop:
+        - "{{ prometheus_config_dir }}"
+        - "{{ prometheus_data_dir }}"
+      tags:
+        - prometheus
+        - directories
+        - setup
+
+    - name: Create Prometheus configuration file
+      ansible.builtin.template:
+        src: "prometheous_files/prometheus.yml.j2"
+        dest: "{{ prometheus_config_dir }}/prometheus.yml"
+        owner: "{{ prometheus_user }}"
+        group: "{{ prometheus_group }}"
+        mode: "0644"
+      tags:
+        - prometheus
+        - config
+        - template
+
+    - name: Create systemd service file for Prometheus
+      ansible.builtin.copy:
+        dest: "{{ prometheus_service_file }}"
+        content: |
+          [Unit]
+          Description=Prometheus
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          User={{ prometheus_user }}
+          Group={{ prometheus_group }}
+          ExecStart=/usr/local/bin/prometheus \
+            --config.file={{ prometheus_config_dir }}/prometheus.yml \
+            --storage.tsdb.path={{ prometheus_data_dir }} \
+            --web.listen-address=:9090
+          Restart=on-failure
+
+          [Install]
+          WantedBy=multi-user.target
+        owner: root
+        group: root
+        mode: "0644"
+      tags:
+        - prometheus
+        - service
+        - systemd
+        - config
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+      tags:
+        - prometheus
+        - systemd
+        - service
+
+    - name: Enable and start Prometheus service
+      ansible.builtin.systemd:
+        name: prometheus
+        enabled: yes
+        state: started
+        daemon_reload: yes
+      tags:
+        - prometheus
+        - start
+        - service

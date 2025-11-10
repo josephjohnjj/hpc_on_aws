@@ -86,6 +86,7 @@
           - make
           - cmake
           - chkconfig
+          - nmap-ncat
         state: present
       tags: packages
 

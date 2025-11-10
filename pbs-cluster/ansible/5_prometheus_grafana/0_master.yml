@@ -1,0 +1,5 @@
+---
+- import_playbook: 1_prometheus.yml
+- import_playbook: 2_node_exporter.yml
+- import_playbook: 3_garafana.yml
+

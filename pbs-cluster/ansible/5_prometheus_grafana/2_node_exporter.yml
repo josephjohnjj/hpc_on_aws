@@ -1,0 +1,116 @@
+---
+- name: Install and Configure Node Exporter
+  hosts: all
+  become: true
+  vars:
+    node_exporter_version: "1.10.2"
+    node_exporter_user: "node_exporter"
+    node_exporter_group: "node_exporter"
+    node_exporter_install_dir: "/opt"
+    node_exporter_binary: "/usr/local/bin/node_exporter"
+    node_exporter_service_file: "/etc/systemd/system/node_exporter.service"
+
+  tasks:
+    - name: Ensure node_exporter system user exists
+      ansible.builtin.user:
+        name: "{{ node_exporter_user }}"
+        system: yes
+        shell: /usr/sbin/nologin
+        create_home: no
+      tags:
+        - node_exporter
+        - user
+        - setup
+
+    - name: Download node_exporter tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+        dest: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+        mode: "0644"
+      tags:
+        - node_exporter
+        - download
+        - setup
+
+    - name: Extract node_exporter tarball to /opt
+      ansible.builtin.unarchive:
+        src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+        dest: "{{ node_exporter_install_dir }}"
+        remote_src: yes
+      tags:
+        - node_exporter
+        - extract
+        - setup
+
+    - name: Create symlink for node_exporter binary
+      ansible.builtin.file:
+        src: "{{ node_exporter_install_dir }}/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+        dest: "{{ node_exporter_binary }}"
+        state: link
+      tags:
+        - node_exporter
+        - symlink
+        - setup
+
+    - name: Verify node_exporter binary version
+      ansible.builtin.command: "{{ node_exporter_binary }} --version"
+      register: node_exporter_version_output
+      changed_when: false
+      tags:
+        - node_exporter
+        - verify
+        - check
+
+    - name: Display node_exporter version
+      ansible.builtin.debug:
+        var: node_exporter_version_output.stdout_lines
+      tags:
+        - node_exporter
+        - verify
+        - check
+
+    - name: Create systemd service file for node_exporter
+      ansible.builtin.copy:
+        dest: "{{ node_exporter_service_file }}"
+        content: |
+          [Unit]
+          Description=Node Exporter
+          After=network.target
+
+          [Service]
+          User={{ node_exporter_user }}
+          Group={{ node_exporter_group }}
+          Type=simple
+          ExecStart={{ node_exporter_binary }}
+          Restart=always
+          RestartSec=5s
+
+          [Install]
+          WantedBy=multi-user.target
+        owner: root
+        group: root
+        mode: "0644"
+      tags:
+        - node_exporter
+        - service
+        - systemd
+        - config
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+      tags:
+        - node_exporter
+        - systemd
+        - service
+
+    - name: Enable and start node_exporter service
+      ansible.builtin.systemd:
+        name: node_exporter
+        enabled: yes
+        state: started
+        daemon_reload: yes
+      tags:
+        - node_exporter
+        - start
+        - service
