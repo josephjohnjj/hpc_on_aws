@@ -1,0 +1,72 @@
+# ---------------------------------------------------------
+# Play 7: Create N MIG Instances per GPU (using variables)
+# ---------------------------------------------------------
+- name: Create MIG instances on each GPU (configurable)
+  hosts: ec2
+  become: yes
+  gather_facts: no
+
+  vars:
+    mig_profile_id: 19 # ID for MIG 1g.5gb profile
+    mig_instance_count: 3 # Number of instances per GPU
+
+  tasks:
+    - name: Check if nvidia-smi is installed
+      command: which nvidia-smi
+      register: nvidia_smi_check
+      changed_when: false
+      failed_when: nvidia_smi_check.rc != 0
+      ignore_errors: yes
+
+    - name: Fail if nvidia-smi is not installed
+      fail:
+        msg: "nvidia-smi not found on this host. Cannot proceed."
+      when: nvidia_smi_check.rc != 0
+
+    - name: Get number of GPUs BEFORE MIG creation
+      command: nvidia-smi --list-gpus
+      register: gpu_list_before
+      changed_when: false
+
+    - name: Set GPU count fact
+      set_fact:
+        gpu_count: "{{ gpu_list_before.stdout_lines | length }}"
+
+    - name: Fail if no GPUs are detected
+      fail:
+        msg: "No GPUs found on this host. Cannot create MIG instances."
+      when: gpu_count == 0
+
+    - name: Delete all existing MIG compute and GPU instances
+      shell: |
+        nvidia-smi mig -dci -i {{ item }}
+        nvidia-smi mig -dgi -i {{ item }}
+      loop: "{{ range(0, gpu_count | int) | list }}"
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Build MIG profile list
+      set_fact:
+        mig_profile_list: "{{ ([mig_profile_id] * mig_instance_count) | join(',') }}"
+
+    - name: Create MIG instances using profile ID {{ mig_profile_id }}
+      shell: |
+        echo "Creating {{ mig_instance_count }} MIG instance(s) on GPU {{ item }} with profile ID {{ mig_profile_id }}"
+        nvidia-smi mig -cgi {{ mig_profile_list }} -C -i {{ item }}
+      loop: "{{ range(0, gpu_count | int) | list }}"
+      register: mig_create_results
+      changed_when: true
+      ignore_errors: false
+
+    - name: Show MIG creation command results
+      debug:
+        var: mig_create_results.results
+
+    - name: List all MIG instances after creation
+      command: nvidia-smi -L
+      register: mig_list
+      changed_when: false
+
+    - name: Show MIG instance list
+      debug:
+        var: mig_list.stdout_lines

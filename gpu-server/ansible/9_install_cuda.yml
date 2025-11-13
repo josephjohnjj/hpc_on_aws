@@ -1,0 +1,64 @@
+# ---------------------------------------------------------
+# Play 11: Install CUDA via Spack
+# ---------------------------------------------------------
+- name: Install CUDA using Spack
+  hosts: ec2
+  become: yes
+  gather_facts: yes
+
+  # Set up Spack environment for all tasks in this play
+  environment:
+    SPACK_ROOT: /apps/spack
+    PATH: "/apps/spack/bin:{{ ansible_env.PATH }}"
+    BASH_ENV: /apps/spack/share/spack/setup-env.sh
+
+  vars:
+    spack_cuda_version: "12.8"
+
+  tasks:
+    # Optional: show available packages
+    - name: List available Spack packages (spack list)
+      shell: . /apps/spack/share/spack/setup-env.sh && spack list
+      register: spack_list
+      changed_when: false
+
+
+    # Discover compilers on the system
+    - name: Detect installed compilers (spack compiler find)
+      shell: . /apps/spack/share/spack/setup-env.sh && spack compiler find
+      register: compiler_find
+      changed_when: false
+
+    - name: List recognized compilers (spack compilers)
+      shell: . /apps/spack/share/spack/setup-env.sh && spack compilers
+      register: compiler_list
+      changed_when: false
+
+    - name: Output recognized compilers
+      debug:
+        var: compiler_list.stdout_lines
+
+    # Install CUDA using Spack
+    - name: Install CUDA {{ spack_cuda_version }}
+      shell: . /apps/spack/share/spack/setup-env.sh && spack install cuda@{{ spack_cuda_version }}
+      args:
+        chdir: /apps/spack
+      register: spack_cuda_install
+      retries: 3
+      delay: 30
+      until: spack_cuda_install.rc == 0
+
+    # Show what's installed
+    - name: List installed Spack packages (spack find)
+      shell: . /apps/spack/share/spack/setup-env.sh && spack find
+      register: spack_find
+      changed_when: false
+
+    - name: Output installed Spack packages
+      debug:
+        var: spack_find.stdout_lines
+
+    # Load the CUDA environment
+    - name: Load CUDA {{ spack_cuda_version }} environment
+      shell: . /apps/spack/share/spack/setup-env.sh && spack load cuda@{{ spack_cuda_version }}
+      changed_when: false

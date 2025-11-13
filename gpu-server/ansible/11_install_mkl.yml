@@ -1,0 +1,60 @@
+# ---------------------------------------------------------
+# Play 11: Install Intel MKL via Spack
+# ---------------------------------------------------------
+- name: Install Intel MKL using Spack
+  hosts: ec2
+  become: yes
+  gather_facts: yes
+
+  vars:
+    spack_root: /apps/spack
+    spack_mkl_package: intel-oneapi-mkl
+
+  # Set up Spack environment for all tasks in this play
+  environment:
+    SPACK_ROOT: "{{ spack_root }}"
+    PATH: "{{ spack_root }}/bin:{{ ansible_env.PATH }}"
+    BASH_ENV: "{{ spack_root }}/share/spack/setup-env.sh"
+
+  tasks:
+    - name: List available Spack packages
+      shell: . {{ spack_root }}/share/spack/setup-env.sh && spack list
+      register: spack_list
+      changed_when: false
+
+    - name: Detect installed compilers
+      shell: . {{ spack_root }}/share/spack/setup-env.sh && spack compiler find
+      register: compiler_find
+      changed_when: false
+
+    - name: List recognized compilers
+      shell: . {{ spack_root }}/share/spack/setup-env.sh && spack compilers
+      register: compiler_list
+      changed_when: false
+
+    - name: Output recognized compilers
+      debug:
+        var: compiler_list.stdout_lines
+
+    - name: Install Intel MKL
+      shell: |
+        . {{ spack_root }}/share/spack/setup-env.sh
+        spack install {{ spack_mkl_package }}
+      args:
+        executable: /bin/bash
+
+    - name: Persist MKL environment for all users
+      lineinfile:
+        path: /etc/profile.d/mkl.sh
+        create: yes
+        line: 'source {{ spack_root }}/share/spack/setup-env.sh && spack load {{ spack_mkl_package }}'
+        state: present
+
+    - name: List installed Spack packages
+      shell: . {{ spack_root }}/share/spack/setup-env.sh && spack find
+      register: spack_find
+      changed_when: false
+
+    - name: Output installed Spack packages
+      debug:
+        var: spack_find.stdout_lines

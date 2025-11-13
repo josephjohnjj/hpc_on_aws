@@ -1,0 +1,28 @@
+# ---------------------------------------------------------
+# Play 2: Install Required System Packages
+# ---------------------------------------------------------
+- name: Install required system packages
+  hosts: ec2
+  become: yes
+  gather_facts: yes
+
+  vars:
+    required_packages:
+      - acl
+      - build-essential
+      - curl
+      - git
+      - wget
+      - htop
+
+  tasks:
+    # Update the package index
+    - name: Force apt update
+      apt:
+        update_cache: yes
+
+    # Install system tools and libraries
+    - name: Install required packages
+      apt:
+        name: "{{ required_packages }}"
+        state: present
