@@ -1,0 +1,173 @@
+---
+- name: Setup BeeGFS on management node
+  hosts: control
+  become: true
+  tags:
+    - management
+  tasks:
+    - name: Ensure /BeeGFS directory exists
+      file:
+        path: /BeeGFS
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      tags:
+        - management
+        - directories
+
+    - name: Format /dev/nvme1n1 as XFS
+      command: mkfs.xfs -f /dev/nvme1n1
+      tags:
+        - management
+        - format
+
+    - name: Mount /dev/nvme1n1 to /BeeGFS
+      mount:
+        path: /BeeGFS
+        src: /dev/nvme1n1
+        fstype: xfs
+        state: mounted
+      tags:
+        - management
+        - mount
+
+    - name: Reload systemd daemon
+      command: systemctl daemon-reload
+      tags:
+        - management
+        - systemd
+
+    - name: Ensure /BeeGFS/management directory exists
+      file:
+        path: /BeeGFS/management
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      tags:
+        - management
+        - directories
+
+- name: Setup BeeGFS on storage nodes
+  hosts: storage
+  become: true
+  tags:
+    - storage
+  tasks:
+    - name: Ensure /BeeGFS directory exists
+      file:
+        path: /BeeGFS
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      tags:
+        - storage
+        - directories
+
+    - name: Format /dev/nvme1n1 as XFS
+      command: mkfs.xfs -f /dev/nvme1n1
+      tags:
+        - storage
+        - format
+
+    - name: Mount /dev/nvme1n1 to /BeeGFS
+      mount:
+        path: /BeeGFS
+        src: /dev/nvme1n1
+        fstype: xfs
+        state: mounted
+      tags:
+        - storage
+        - mount
+
+    - name: Reload systemd daemon
+      command: systemctl daemon-reload
+      tags:
+        - storage
+        - systemd
+
+    - name: Ensure /BeeGFS/metadata directory exists
+      file:
+        path: /BeeGFS/metadata
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      tags:
+        - storage
+        - directories
+
+    - name: Ensure /storage, /storage/stor1, /storage/stor2 exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - /storage
+        - /storage/stor1
+        - /storage/stor2
+      tags:
+        - storage
+        - directories
+
+    - name: Format /dev/nvme2n1 as XFS
+      command: mkfs.xfs -f /dev/nvme2n1
+      tags:
+        - storage
+        - format
+
+    - name: Format /dev/nvme3n1 as XFS
+      command: mkfs.xfs -f /dev/nvme3n1
+      tags:
+        - storage
+        - format
+
+    - name: Mount /dev/nvme2n1 to /storage/stor1
+      mount:
+        path: /storage/stor1
+        src: /dev/nvme2n1
+        fstype: xfs
+        state: mounted
+      tags:
+        - storage
+        - mount
+
+    - name: Mount /dev/nvme3n1 to /storage/stor2
+      mount:
+        path: /storage/stor2
+        src: /dev/nvme3n1
+        fstype: xfs
+        state: mounted
+      tags:
+        - storage
+        - mount
+
+    - name: Reload systemd daemon
+      command: systemctl daemon-reload
+      tags:
+        - storage
+        - systemd
+
+- name: Client directories
+  hosts:
+    - login
+    - compute
+  become: true
+  tags:
+    - client
+    - config
+  tasks:
+    - name: Ensure /scratch directory exists
+      file:
+        path: /scratch
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      tags:
+        - client
+        - directories

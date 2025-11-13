@@ -1,0 +1,8 @@
+---
+# master_setup.yml
+- import_playbook: 1_install_server_packages.yml 
+- import_playbook: 2_ldif_files_to_server.yml
+- import_playbook: 3_apply_config.yml
+- import_playbook: 4_install_client.yml
+
+

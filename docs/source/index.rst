@@ -13,3 +13,4 @@ Contents
    initial_setup.rst
    terraform.rst
    ansible.rst
+   pbs_cluster.rst

@@ -1,0 +1,83 @@
+{
+  "compute_node_private_ips": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string",
+        "string",
+        "string"
+      ]
+    ],
+    "value": [
+      "10.0.1.170",
+      "10.0.1.242",
+      "10.0.1.38"
+    ]
+  },
+  "compute_node_public_ips": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string",
+        "string",
+        "string"
+      ]
+    ],
+    "value": [
+      "13.221.60.227",
+      "98.84.15.106",
+      "98.80.100.75"
+    ]
+  },
+  "control_node_private_ip": {
+    "sensitive": false,
+    "type": "string",
+    "value": "10.0.1.32"
+  },
+  "control_node_public_ip": {
+    "sensitive": false,
+    "type": "string",
+    "value": "44.200.168.7"
+  },
+  "efs_apps_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "fs-0e703b59cb071b76f"
+  },
+  "efs_home_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "fs-0188991f02fe6aaa1"
+  },
+  "efs_scratch_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "fs-0287125a33b07fa6f"
+  },
+  "login_node_private_ips": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string"
+      ]
+    ],
+    "value": [
+      "10.0.1.183"
+    ]
+  },
+  "login_node_public_ips": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string"
+      ]
+    ],
+    "value": [
+      "3.238.118.119"
+    ]
+  }
+}

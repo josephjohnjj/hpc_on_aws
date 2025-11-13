@@ -1,0 +1,77 @@
+---
+- name: Update config on PBS on head node
+  hosts: control
+  become: yes
+  vars:
+    pbs_conf_path: /etc/pbs.conf
+    pbs_exec: /opt/pbs
+    pbs_home: /var/spool/pbs
+    pbs_server: node1
+  tasks:
+    - name: Update config on PBS on head node
+      ansible.builtin.copy:
+        dest: "{{ pbs_conf_path }}"
+        content: |
+          PBS_SERVER={{ pbs_server }}
+          PBS_START_SERVER=1
+          PBS_START_SCHED=1
+          PBS_START_COMM=1
+          PBS_START_MOM=0
+          PBS_EXEC={{ pbs_exec }}
+          PBS_HOME={{ pbs_home }}
+          PBS_CORE_LIMIT=unlimited
+          PBS_SCP=/bin/scp
+        owner: root
+        group: root
+        mode: "0644"
+      tags: pbs_conf
+
+- name: Update config on PBS on compute nodes
+  hosts: compute
+  become: yes
+  vars:
+    pbs_conf_path: /etc/pbs.conf
+    pbs_exec: /opt/pbs
+    pbs_home: /var/spool/pbs
+    pbs_server: node1
+  tasks:
+    - name: Update config on PBS on compute node
+      ansible.builtin.copy:
+        dest: "{{ pbs_conf_path }}"
+        content: |
+          PBS_SERVER={{ pbs_server }}
+          PBS_START_SERVER=0
+          PBS_START_SCHED=0
+          PBS_START_COMM=0
+          PBS_START_MOM=1
+          PBS_EXEC={{ pbs_exec }}
+          PBS_HOME={{ pbs_home }}
+        owner: root
+        group: root
+        mode: "0644"
+      tags: pbs_conf
+
+- name: Update config on PBS on login nodes
+  hosts: login
+  become: yes
+  vars:
+    pbs_conf_path: /etc/pbs.conf
+    pbs_exec: /opt/pbs
+    pbs_home: /var/spool/pbs
+    pbs_server: node1
+  tasks:
+    - name: Update config on PBS on login node
+      ansible.builtin.copy:
+        dest: "{{ pbs_conf_path }}"
+        content: |
+          PBS_SERVER={{ pbs_server }}
+          PBS_START_SERVER=0
+          PBS_START_SCHED=0
+          PBS_START_COMM=0
+          PBS_START_MOM=0
+          PBS_EXEC={{ pbs_exec }}
+          PBS_HOME={{ pbs_home }}
+        owner: root
+        group: root
+        mode: "0644"
+      tags: pbs_conf

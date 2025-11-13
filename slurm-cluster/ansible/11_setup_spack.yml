@@ -1,0 +1,45 @@
+---
+- name: Setup EC2 instance with spackuser to install software in /apps
+  hosts: ec2
+  become: yes
+
+  vars:
+    app_dir: /apps
+    git_repo: "https://github.com/spack/spack.git"
+    spack_user: spackuser
+    spack_password: "Nci@Kambri" # Replace with secure password
+
+  tasks:
+    - name: Ensure /apps directory exists
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ spack_user }}"
+        group: "{{ spack_user }}"
+        mode: "0755"
+
+    - name: Create spackuser with sudo privileges
+      user:
+        name: "{{ spack_user }}"
+        password: "{{ spack_password | password_hash('sha512') }}"
+        shell: /bin/bash
+        groups: sudo
+        append: yes
+        create_home: yes
+        state: present
+
+    - name: Allow spackuser to run sudo without password (optional)
+      copy:
+        dest: "/etc/sudoers.d/{{ spack_user }}"
+        content: "{{ spack_user }} ALL=(ALL) NOPASSWD:ALL"
+        owner: root
+        group: root
+        mode: "0440"
+
+    - name: Clone Spack repo into /apps/spack as spackuser
+      git:
+        repo: "{{ git_repo }}"
+        dest: "{{ app_dir }}/spack"
+        depth: 2
+        update: yes
+      become_user: "{{ spack_user }}"

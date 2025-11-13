@@ -1,0 +1,37 @@
+---
+- name: Start PBS service on head node
+  hosts: control
+  become: yes
+
+  tasks:
+    - name: Enable and start PBS service
+      ansible.builtin.shell: |
+        systemctl enable pbs || true
+        systemctl start pbs
+      tags: start_pbs_head
+
+- name: Start PBS service on login node
+  hosts: login
+  become: yes
+  tasks:
+    - name: Start PBS service
+      ansible.builtin.systemd:
+        name: pbs
+        state: started
+        enabled: yes
+      tags: start_pbs_login
+
+- name: Enable and start PBS MOM on compute nodes
+  hosts: compute
+  become: yes
+  tasks:
+    - name: Enable and start PBS MOM service
+      ansible.builtin.shell: |
+        systemctl enable pbs || true
+        systemctl start pbs
+      tags:
+        - pbs
+        - start_pbs_compute
+        - enable_pbs_mom
+
+

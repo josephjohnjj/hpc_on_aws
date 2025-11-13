@@ -1,0 +1,22 @@
+---
+- name: Fix sudo latency issues by updating /etc/hosts and sudoers
+  hosts: all
+  become: yes
+  gather_facts: yes # We need ansible_fqdn and ansible_default_ipv4.address
+
+  tasks:
+    - name: Add self-referencing hostname to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ ansible_default_ipv4.address }} {{ ansible_hostname }} {{ ansible_fqdn }}"
+        state: present
+        create: yes
+      when: ansible_default_ipv4.address is defined and ansible_hostname is defined and ansible_fqdn is defined
+
+    - name: Ensure 'Defaults !fqdn' is present in sudoers
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: "^Defaults !fqdn"
+        line: "Defaults !fqdn"
+        validate: "/usr/sbin/visudo -cf %s"

@@ -1,0 +1,40 @@
+---
+- name: Add PBS compute nodes on head node
+  hosts: control
+  become: yes
+  vars:
+    pbs_exec: /opt/pbs
+    compute_nodes:
+      - node3
+      - node4
+      - node5
+
+  tasks:
+    - name: Create PBS compute nodes
+      ansible.builtin.command: "{{ pbs_exec }}/bin/qmgr -c 'create node {{ item }}'"
+      loop: "{{ compute_nodes }}"
+      register: create_nodes
+      ignore_errors: yes
+      tags: create_nodes
+
+    - name: Show PBS nodes
+      ansible.builtin.command: "{{ pbs_exec }}/bin/pbsnodes -a"
+      register: pbs_nodes
+      tags: show_nodes
+
+    - name: Print PBS nodes
+      ansible.builtin.debug:
+        var: pbs_nodes.stdout_lines
+      tags: show_nodes
+
+    - name: Set default queue to workq
+      ansible.builtin.command:
+        cmd: /opt/pbs/bin/qmgr -c "set server default_queue = workq"
+
+    - name: Set default select resources to 1
+      ansible.builtin.command:
+        cmd: /opt/pbs/bin/qmgr -c "set server resources_default.select = 1"
+
+    - name: Enable flatuid on PBS server
+      ansible.builtin.command:
+        cmd: /opt/pbs/bin/qmgr -c "set server flatuid = True"

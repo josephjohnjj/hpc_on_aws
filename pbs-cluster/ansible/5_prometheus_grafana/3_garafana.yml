@@ -1,0 +1,72 @@
+---
+- name: Install and Configure Grafana
+  hosts: control
+  become: true
+  vars:
+    grafana_repo_file: "/etc/yum.repos.d/grafana.repo"
+    grafana_gpg_key: "https://rpm.grafana.com/gpg.key"
+    grafana_repo_content: |
+      [grafana]
+      name=grafana
+      baseurl=https://rpm.grafana.com
+      repo_gpgcheck=1
+      enabled=1
+      gpgcheck=1
+      gpgkey=https://rpm.grafana.com/gpg.key
+      sslverify=1
+      sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+
+  tasks:
+    - name: Download Grafana GPG key
+      ansible.builtin.get_url:
+        url: "{{ grafana_gpg_key }}"
+        dest: "/tmp/grafana_gpg.key"
+        mode: "0644"
+      tags:
+        - grafana
+        - repo
+        - setup
+
+    - name: Import Grafana GPG key
+      ansible.builtin.rpm_key:
+        state: present
+        key: "/tmp/grafana_gpg.key"
+      tags:
+        - grafana
+        - repo
+        - setup
+
+    - name: Create Grafana YUM repository file
+      ansible.builtin.copy:
+        dest: "{{ grafana_repo_file }}"
+        content: "{{ grafana_repo_content }}"
+        owner: root
+        group: root
+        mode: "0644"
+      tags:
+        - grafana
+        - repo
+        - config
+
+    - name: Install Grafana package
+      ansible.builtin.dnf:
+        name: grafana
+        state: present
+      tags:
+        - grafana
+        - install
+        - setup
+
+   
+    - name: Enable and start Grafana service
+      ansible.builtin.systemd:
+        name: grafana-server
+        enabled: yes
+        state: started
+        daemon_reload: yes
+      tags:
+        - grafana
+        - service
+        - start
+
+

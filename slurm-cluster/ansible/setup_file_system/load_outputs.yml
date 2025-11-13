@@ -1,0 +1,18 @@
+- name: Run terraform output -json and parse outputs
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Run terraform output -json
+      shell: terraform output -json
+      args:
+        chdir: ../../  # Adjust to your Terraform directory path relative to the playbook
+      register: terraform_output
+      changed_when: false
+
+    - name: Set terraform outputs fact
+      set_fact:
+        tf_outputs: "{{ terraform_output.stdout | from_json }}"
+
+    - name: Debug outputs to verify
+      debug:
+        var: tf_outputs

@@ -1,0 +1,78 @@
+- name: Setup BeeGFS metadata targets on storage nodes
+  hosts: storage
+  become: true
+  tags:
+    - storage
+    - setup
+  vars:
+    meta_targets:
+      node6:
+        storage_id: 1
+        path: /BeeGFS/metadata/
+        mgmtd: node1
+      node7:
+        storage_id: 2
+        path: /BeeGFS/metadata/
+        mgmtd: node1
+  tasks:
+    - name: Setup BeeGFS metadata target per node
+      command: >
+        /opt/beegfs/sbin/beegfs-setup-meta
+        -p {{ meta_targets[inventory_hostname].path }}
+        -s {{ meta_targets[inventory_hostname].storage_id }}
+        -m {{ meta_targets[inventory_hostname].mgmtd }}
+      register: meta_setup
+      failed_when: meta_setup.rc != 0
+      changed_when: true
+      tags:
+        - storage
+        - setup
+
+    - name: Display beegfs-setup-meta output
+      debug:
+        msg: "{{ inventory_hostname }} output: {{ meta_setup.stdout }}"
+      tags:
+        - storage
+        - setup
+        - debug
+
+
+- name: Start BeeGFS metadata service on storage nodes
+  hosts: storage
+  become: true
+  tags:
+    - storage
+    - start
+  tasks:
+    - name: Start beegfs-meta service
+      systemd:
+        name: beegfs-meta
+        state: started
+        enabled: yes
+      tags:
+        - storage
+        - start
+
+
+- name: List BeeGFS metadata nodes
+  hosts: control
+  become: true
+  tags:
+    - management
+    - status
+  tasks:
+    - name: Run beegfs node list for metadata nodes
+      command: /opt/beegfs/sbin/beegfs node list --mgmtd-addr node1:8010 --node-type meta
+      register: meta_nodes
+      ignore_errors: yes
+      tags:
+        - management
+        - status
+
+    - name: Display metadata nodes
+      debug:
+        msg: "{{ meta_nodes.stdout }}"
+      tags:
+        - management
+        - status
+        - debug

@@ -1,0 +1,46 @@
+---
+
+- name: Setup Red Hat node for BeeGFS
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    
+    - name: Install required packages
+      dnf:
+        name:
+          - "kernel-devel-{{ ansible_kernel }}"
+          - "kernel-headers-{{ ansible_kernel }}"
+        state: present
+      tags:
+        - packages
+        - beegfs
+
+    - name: Download BeeGFS RHEL 9 repo (v8.2)
+      get_url:
+        url: "https://www.beegfs.io/release/beegfs_8.2/dists/beegfs-rhel9.repo"
+        dest: /etc/yum.repos.d/beegfs-rhel9.repo
+        mode: "0644"
+      tags:
+        - repo
+        - beegfs
+
+    - name: Ensure /opt/beegfs/sbin is in PATH for all users
+      lineinfile:
+        path: /etc/profile.d/beegfs.sh
+        create: yes
+        line: "export PATH=$PATH:/opt/beegfs/sbin"
+        state: present
+        mode: "0755"
+      tags:
+        - path
+        - beegfs
+
+    - name: Reload profile to update PATH
+      shell: source /etc/profile.d/beegfs.sh
+      args:
+        executable: /bin/bash
+      tags:
+        - path
+        - beegfs

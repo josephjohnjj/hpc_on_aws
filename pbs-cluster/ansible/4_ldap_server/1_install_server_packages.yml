@@ -1,0 +1,46 @@
+---
+- name: Install and enable OpenLDAP server on control node
+  hosts: control
+  become: yes
+  tasks:
+
+    
+    - name: Install OpenLDAP server and client packages
+      ansible.builtin.dnf:
+        name:
+          - openldap-servers
+          - openldap-clients
+        state: present
+        update_cache: yes
+      tags:
+        - ldap
+        - install
+        - install_openldap
+
+    - name: Start and enable slapd service
+      ansible.builtin.systemd:
+        name: slapd
+        state: started
+        enabled: yes
+      tags:
+        - ldap
+        - service
+        - start_slapd
+
+    - name: Verify slapd service status
+      ansible.builtin.command:
+        cmd: systemctl status slapd
+      register: slapd_status
+      changed_when: false
+      tags:
+        - ldap
+        - service
+        - check_slapd_status
+
+    - name: Display slapd status output
+      ansible.builtin.debug:
+        var: slapd_status.stdout_lines
+      tags:
+        - ldap
+        - debug
+        - check_slapd_status

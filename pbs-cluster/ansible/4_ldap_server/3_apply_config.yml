@@ -1,0 +1,138 @@
+---
+- name: Apply changerootpass.ldif
+  hosts: control
+  become: yes
+  tasks:
+    - name: Apply changerootpass.ldif
+      command: ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/ldif/changerootpass.ldif
+      tags:
+        - ldap
+        - changerootpass
+
+    - name: Add cosine schema
+      command: ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/cosine.ldif
+      tags:
+        - ldap
+        - schema
+        - cosine
+
+    - name: Add nis schema
+      command: ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/nis.ldif
+      tags:
+        - ldap
+        - schema
+        - nis
+
+    - name: Add inetorgperson schema
+      command: ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/inetorgperson.ldif
+      tags:
+        - ldap
+        - schema
+        - inetorgperson
+
+    - name: Restart slapd
+      systemd:
+        name: slapd
+        state: restarted
+        enabled: yes
+      tags:
+        - ldap
+        - restart
+
+    
+    - name: Apply setdomain.ldif
+      command: ldapmodify -Y EXTERNAL -H ldapi:/// -f /etc/openldap/ldif/setdomain.ldif      
+      tags:
+        - ldap
+        - setdomain
+     
+    - name: Apply addou.ldif
+      command: ldapadd -x -D cn=Manager,dc=cluster,dc=lan -w "ldappassword" -f /etc/openldap/ldif/addou.ldif
+      tags:
+        - ldap
+        - addou
+
+    
+    - name: Apply user1.ldif
+      command: ldapadd -x -D cn=Manager,dc=cluster,dc=lan -w "ldappassword"  -f /etc/openldap/ldif/user1.ldif
+      tags:
+        - ldap
+        - user1
+
+
+    - name: Ensure /etc/pki/tls directory exists
+      file:
+        path: /etc/pki/tls
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      tags:
+        - ldap
+        - tls
+        - prepare_dir
+
+    - name: Generate self-signed LDAP TLS certificate and key
+      shell: |
+        openssl req -x509 -nodes -days 365 \
+          -newkey rsa:2048 \
+          -keyout /etc/pki/tls/ldapserver.key \
+          -out /etc/pki/tls/ldapserver.crt \
+          -subj "/C=US/ST=State/L=City/O=ExampleOrg/OU=IT/CN=node1" \
+          -addext "subjectAltName=DNS:node1"
+      args:
+        creates: /etc/pki/tls/ldapserver.crt
+      tags:
+        - ldap
+        - tls
+        - generate_cert
+
+    - name: Set ownership of LDAP TLS certificate and key
+      file:
+        path: "/etc/pki/tls/{{ item }}"
+        owner: ldap
+        group: ldap
+        mode: "{{ '0644' if item == 'ldapserver.crt' else '0600' }}"
+      loop:
+        - ldapserver.crt
+        - ldapserver.key
+      tags:
+        - ldap
+        - tls
+        - set_permissions
+
+
+
+    - name: Apply tls.ldif
+      command: ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/ldif/tls.ldif
+      tags:
+        - ldap
+        - tls
+
+    - name: Ensure TLS_CACERT is set
+      lineinfile:
+        path: /etc/openldap/ldap.conf
+        regexp: '^TLS_CACERT'
+        line: 'TLS_CACERT /etc/pki/tls/cert.pem'
+        state: present
+        create: yes
+      tags:
+        - ldap
+        - tls
+        - ldap_conf
+
+    - name: Ensure TLS_REQCERT is set
+      lineinfile:
+        path: /etc/openldap/ldap.conf
+        regexp: '^TLS_REQCERT'
+        line: 'TLS_REQCERT never'
+        state: present
+        create: yes
+      tags:
+        - ldap
+        - tls
+        - ldap_conf
+
+
+
+

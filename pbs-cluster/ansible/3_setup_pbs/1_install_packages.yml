@@ -1,0 +1,38 @@
+---
+- name: Install OpenPBS dependencies on all nodes
+  hosts: all
+  become: yes
+  tasks:
+
+
+    - name: Install required packages
+      ansible.builtin.dnf:
+        name:
+          - libedit-devel
+          - libical-devel
+          - ncurses-devel
+          - rpm-build
+          - libtool
+          - libX11-devel
+          - libXt-devel
+          - libXext
+          - libXext-devel
+          - libXmu-devel
+          - tcl-devel
+          - tk-devel
+          - postgresql-devel
+          - postgresql-server
+          - postgresql-contrib
+          - expat-devel
+          - openssl-devel
+          - hwloc-devel
+          - java-21-openjdk-devel
+          - cjson-devel
+          - swig
+          - swig-doc
+          - sendmail
+        state: present
+        update_cache: yes
+      tags: packages
+
+    

@@ -1,0 +1,45 @@
+- name: Deploy control + login SSH keys into compute nodes
+  hosts: compute
+  become: yes
+  gather_facts: no
+
+  vars:
+    ssh_user: ubuntu
+    ssh_home: "/home/{{ ssh_user }}"
+    ssh_key_path: "{{ ssh_home }}/.ssh/id_rsa"
+    authorized_keys_path: "{{ ssh_home }}/.ssh/authorized_keys"
+
+  tasks:
+    - name: Fetch control node public key
+      delegate_to: node1
+      slurp:
+        src: "{{ ssh_key_path }}.pub"
+      register: control_pubkey
+
+    - name: Fetch login node public key
+      delegate_to: node2
+      slurp:
+        src: "{{ ssh_key_path }}.pub"
+      register: login_pubkey
+
+    - name: Combine both public keys
+      set_fact:
+        combined_keys: |
+          {{ control_pubkey.content | b64decode }}
+          {{ login_pubkey.content | b64decode }}
+
+    - name: Ensure .ssh directory exists on compute nodes
+      file:
+        path: "{{ ssh_home }}/.ssh"
+        state: directory
+        owner: "{{ ssh_user }}"
+        group: "{{ ssh_user }}"
+        mode: '0700'
+
+    - name: Deploy combined authorized_keys to compute nodes
+      copy:
+        content: "{{ combined_keys | trim }}"
+        dest: "{{ authorized_keys_path }}"
+        owner: "{{ ssh_user }}"
+        group: "{{ ssh_user }}"
+        mode: '0600'
